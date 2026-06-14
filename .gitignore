@@ -1,0 +1,25 @@
+# Node / npm (将来バンドラを導入した場合)
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ビルド成果物
+dist/
+build/
+.parcel-cache/
+.vite/
+
+# 環境変数 / シークレット
+.env
+.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
