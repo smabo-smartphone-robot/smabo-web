@@ -4,11 +4,6 @@ export interface RosbridgeMsg {
   op: string;
   topic?: string;
   msg?: unknown;
-  config?: Record<string, unknown>;
-  // service_response（受信）で参照するフィールド
-  id?: string;
-  result?: boolean;
-  values?: unknown;
 }
 
 export interface Vec3 { x: number; y: number; z: number; }

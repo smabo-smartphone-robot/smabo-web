@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { brain } from '../ws/brain';
+import { esp32 } from '../ws/esp32';
 import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, CompressedImageMsg, Quat } from '../ws/types';
+
+const ESP32_HOST_KEY = 'smabo-esp32-host';
 
 function toEuler(q: Quat) {
   const { x, y, z, w } = q;
@@ -41,6 +44,7 @@ interface Toast {
 interface BrainStore {
   status: ConnStatus;
   host: string;
+  esp32Host: string;
   msgRate: number;
 
   // Drive
@@ -68,12 +72,16 @@ interface BrainStore {
   // Actions
   setHost(h: string): void;
   connect(): void;
+  setEsp32Host(h: string): void;
+  refreshConfig(): void;
   clearTrail(): void;
   addLog(entry: Omit<LogEntry, 'id'>): void;
   clearLogs(): void;
   addSentLog(text: string): void;
   addToast(msg: string, type?: 'ok' | 'err'): void;
   patchConfig(patch: Record<string, unknown>): void;
+  removeConfig(patch: Record<string, unknown>): void;
+  setMode(modes: Record<string, unknown>): void;
 }
 
 let msgCount = 0;
@@ -138,8 +146,6 @@ export const useBrain = create<BrainStore>((set, get) => {
         const m = msg.msg as CompressedImageMsg;
         set({ cameraJpeg: m.data });
       }
-    } else if (msg.op === 'set_config' && msg.config) {
-      set({ esp32Config: msg.config });
     }
 
     // Add to log
@@ -153,9 +159,6 @@ export const useBrain = create<BrainStore>((set, get) => {
   brain.onStatus((s: ConnStatus) => {
     set({ status: s });
     if (s === 'connected') {
-      brain.callService<{ config: Record<string, unknown> }>('/esp32/get_config')
-        .then(v => { if (v?.config) set({ esp32Config: v.config }); })
-        .catch(() => get().addToast('Config 取得失敗', 'err'));
       get().addLog({ type: 'info', text: 'Brain 接続完了' });
       get().addToast('Brain 接続完了', 'ok');
     } else if (s === 'disconnected') {
@@ -172,9 +175,14 @@ export const useBrain = create<BrainStore>((set, get) => {
     msgCount = 0;
   }, 1000);
 
+  const initialEsp32Host =
+    (typeof localStorage !== 'undefined' && localStorage.getItem(ESP32_HOST_KEY)) || '';
+  esp32.setHost(initialEsp32Host);
+
   return {
     status: 'disconnected',
     host: 'localhost:9090',
+    esp32Host: initialEsp32Host,
     msgRate: 0,
 
     odom: null,
@@ -194,6 +202,21 @@ export const useBrain = create<BrainStore>((set, get) => {
     connect: () => {
       const { host } = get();
       brain.connect(host);
+    },
+
+    setEsp32Host: (h) => {
+      esp32.setHost(h);
+      if (typeof localStorage !== 'undefined') localStorage.setItem(ESP32_HOST_KEY, h);
+      set({ esp32Host: h });
+    },
+
+    refreshConfig: () => {
+      esp32.getConfig()
+        .then(config => {
+          set({ esp32Config: config });
+          get().addToast('Config 取得', 'ok');
+        })
+        .catch(() => get().addToast('Config 取得失敗', 'err'));
     },
 
     clearTrail: () => set({ trail: [] }),
@@ -220,11 +243,25 @@ export const useBrain = create<BrainStore>((set, get) => {
     },
 
     patchConfig: (patch) => {
+      // 楽観的に即反映してから ESP32 へ直接 POST
       set(s => ({
         esp32Config: s.esp32Config ? deepMerge(s.esp32Config, patch) : patch,
       }));
-      brain.callService('/esp32/set_config', { config: patch })
+      esp32.setConfig(patch)
         .catch(() => get().addToast('Config 送信失敗', 'err'));
+    },
+
+    removeConfig: (patch) => {
+      // 削除（null 値）は楽観反映せず、送信後に再取得して正とする
+      esp32.setConfig(patch)
+        .then(() => get().refreshConfig())
+        .catch(() => get().addToast('Config 送信失敗', 'err'));
+    },
+
+    setMode: (modes) => {
+      esp32.setMode(modes)
+        .then(() => get().refreshConfig())
+        .catch(() => get().addToast('Mode 送信失敗', 'err'));
     },
   };
 });

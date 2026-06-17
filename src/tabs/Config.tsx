@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useBrain } from '../store/useBrain';
-import { brain } from '../ws/brain';
 import { useDragOrder } from '../hooks/useDragOrder';
 
 // ── field components ─────────────────────────────────────────
@@ -73,6 +72,9 @@ function s(v: unknown, def = ''): string {
 export function Config() {
   const esp32Config = useBrain(st => st.esp32Config);
   const patchConfig = useBrain(st => st.patchConfig);
+  const removeConfig = useBrain(st => st.removeConfig);
+  const setMode = useBrain(st => st.setMode);
+  const refreshConfig = useBrain(st => st.refreshConfig);
   const { sort: sortServos, handleProps: servoHandle, dropProps: servoDrop } = useDragOrder('smabo-config-servos-order');
 
   // staged holds a nested patch for the Advanced section
@@ -82,8 +84,8 @@ export function Config() {
   if (!esp32Config) {
     return (
       <div className="no-data" style={{ padding: 16, gap: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <span>Config 未受信</span>
-        <button onClick={() => brain.send({ op: 'get_config' })}>Get config</button>
+        <span>Config 未受信（ヘッダーで ESP32 ホストを設定）</span>
+        <button onClick={refreshConfig}>Get config</button>
       </div>
     );
   }
@@ -107,7 +109,7 @@ export function Config() {
   const brainCfg   = rec(cfg['brain']);
 
   const patch = (p: Record<string, unknown>) => patchConfig(p);
-  const sendMode = (m: Record<string, unknown>) => brain.send({ op: 'set_mode', modes: m });
+  const sendMode = (m: Record<string, unknown>) => setMode(m);
 
   // Stage helpers for Advanced section
   type MergeSetFn = (prev: Record<string, unknown>) => Record<string, unknown>;
@@ -117,7 +119,7 @@ export function Config() {
     <div className="config-layout">
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        <button onClick={() => brain.send({ op: 'get_config' })}>Get config</button>
+        <button onClick={refreshConfig}>Get config</button>
       </div>
 
       {/* Modes */}
@@ -165,7 +167,7 @@ export function Config() {
                     style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent', fontSize: '.72rem', marginTop: 4 }}
                     onClick={() => {
                       if (!confirm(`"${name}" を削除しますか？`)) return;
-                      brain.send({ op: 'set_config', config: { servos: { joints: { [name]: null } } } });
+                      removeConfig({ servos: { joints: { [name]: null } } });
                     }}
                   >削除</button>
                 </div>

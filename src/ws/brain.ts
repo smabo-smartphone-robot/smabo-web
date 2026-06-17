@@ -3,17 +3,11 @@ import type { ConnStatus, RosbridgeMsg } from './types';
 type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
 
-interface Pending {
-  resolve: (values: unknown) => void;
-  reject: (err: Error) => void;
-}
-
 class BrainClient {
   private ws: WebSocket | null = null;
   private msgHandlers = new Set<MsgHandler>();
   private statusHandlers = new Set<StatusHandler>();
   private _status: ConnStatus = 'disconnected';
-  private pending = new Map<string, Pending>();
 
   get isConnected(): boolean {
     return this._status === 'connected';
@@ -42,21 +36,6 @@ class BrainClient {
     this.ws.onmessage = (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data as string) as RosbridgeMsg;
-
-        // service_response はペンディングコールに振り、msgHandlers には渡さない
-        if (msg.op === 'service_response' && msg.id) {
-          const p = this.pending.get(msg.id);
-          if (p) {
-            this.pending.delete(msg.id);
-            if (msg.result) {
-              p.resolve(msg.values);
-            } else {
-              p.reject(new Error('service call failed'));
-            }
-            return;
-          }
-        }
-
         this.msgHandlers.forEach(h => h(msg));
       } catch {
         // ignore parse errors
@@ -94,24 +73,6 @@ class BrainClient {
     // 送信元を示す '/web' prefix を付ける。brain が剥がしてから
     // canonical なトピック名で宛先デバイスに再配信する。
     this.send({ op: 'publish', topic: `/web${topic}`, msg });
-  }
-
-  /** rosbridge call_service 互換のリクエスト/レスポンス呼び出し */
-  callService<T = unknown>(service: string, args: unknown = {}, timeoutMs = 5000): Promise<T> {
-    const id = Math.random().toString(36).slice(2, 10);
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`service timeout: ${service}`));
-      }, timeoutMs);
-
-      this.pending.set(id, {
-        resolve: (v) => { clearTimeout(timer); resolve(v as T); },
-        reject: (e) => { clearTimeout(timer); reject(e); },
-      });
-
-      this.send({ op: 'call_service', id, service, args });
-    });
   }
 
   onMsg(handler: MsgHandler): () => void {

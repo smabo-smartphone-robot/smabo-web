@@ -40,6 +40,7 @@ function getManualServos(config: Record<string, unknown> | null): { name: string
 
 export function Arm() {
   const esp32Config = useBrain(s => s.esp32Config);
+  const refreshConfig = useBrain(s => s.refreshConfig);
   const manualServos = getManualServos(esp32Config);
   const { sort, handleProps, dropProps } = useDragOrder('smabo-arm-order');
 
@@ -80,14 +81,14 @@ export function Arm() {
   return (
     <div className="arm-layout">
       <div className="arm-header">
-        <button onClick={() => brain.send({ op: 'get_config' })}>Config 取得</button>
+        <button onClick={refreshConfig}>Config 取得</button>
         <button onClick={handleHome} disabled={manualServos.length === 0}>Home</button>
       </div>
 
       {manualServos.length === 0 ? (
         <div className="no-data">
           {esp32Config === null
-            ? 'Brain に接続すると自動で Config を取得します。'
+            ? 'ヘッダーで ESP32 ホストを設定し「Config取得」を押してください。'
             : 'random_groups に含まれないサーボがありません。'}
         </div>
       ) : (
