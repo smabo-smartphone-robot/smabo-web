@@ -2,35 +2,68 @@
 
 smabo ロボットの操作・可視化用 web フロントエンド。
 
-ロボット本体の「外側」に立つツールで、中継サーバ **smabo-brain** に WebSocket
-クライアントとして接続し、走行・アーム操作、ESP32 設定、センサ可視化を行います。
+中継サーバ **smabo-brain** に WebSocket クライアントとして接続し、
+走行・アーム操作・センサ可視化を行います。
+ESP32 の設定変更は brain を介さず REST で直接行います。
 
 ```
 smabo-app ──►  smabo-brain  ◄── smabo-web（このリポジトリ）
                    ▲
                    └──  smabo-esp32
+                              ▲
+                              └── smabo-web（REST: /config, /mode）
 ```
 
-ビルド不要の単一 HTML（バニラ JS）です。
+**スタック:** React 18 / TypeScript / Vite 6
 
-## 使い方
+## セットアップ
 
-`index.html` をブラウザで開くだけです。
+```bash
+npm install
+```
 
-- ローカルファイルを直接開く（`file://`）
-- 任意の静的サーバ経由（例: `python -m http.server`）
-- GitHub Pages 等でホスティング
+## 起動
 
-起動後、ヘッダの **Brain** 欄に smabo-brain のホストを入力して「接続」します
-（接続先は `ws://<brain-host>:9090/ui`）。
+| コマンド | 用途 |
+|----------|------|
+| `npm run dev` | 開発サーバ（ホットリロード付き、デフォルト http://localhost:5173） |
+| `npm run build` | 本番ビルド → `dist/` |
+| `npm run preview` | ビルド結果をローカルで確認 |
+
+### デプロイ
+
+`npm run build` で生成された `dist/` を任意の静的ホスティングに置くだけです。
+
+```bash
+# 手元で確認する場合
+npm run preview
+# または
+python -m http.server --directory dist
+```
+
+## 接続
+
+ヘッダーに 2 つの接続先を入力します。
+
+| 入力欄 | 接続先 | プロトコル |
+|--------|--------|------------|
+| Brain host:port | smabo-brain | `ws://<host>/ui` |
+| ESP32 host (REST) | smabo-esp32 | `http://<host>/config`, `/mode` |
+
+- **Brain** 欄を入力して「接続」（または Enter）→ WebSocket 接続
+- **ESP32** 欄を入力して「Config 取得」（または Enter）→ `GET /config` で設定を取得
+
+送信トピックにはすべて `/web` prefix が自動付与されます（brain 側で剥がして再配信）。
 
 ## 画面
 
 | タブ | 役割 |
 |------|------|
-| Drive | バーチャルジョイスティックで `/cmd_vel` を 10Hz 送信、オドメトリ表示 |
-| Arm | ESP32 config から生成したサーボスライダーで `/servo/command` 送信 |
-| ESP32 Config | `get_config` / `set_config` / `set_mode` による設定編集 |
-| Log | brain 受信メッセージの表示・手動送信 |
+| Drive | バーチャルジョイスティックで `/cmd_vel` を送信。速度上限スライダー・オドメトリ表示・Trail Map 付き |
+| Sensors | IMU (Roll/Pitch/Yaw/Gyro/Accel)・GPS・Camera 映像をリアルタイム表示 |
+| Arm | ESP32 config の `joints` から生成したサーボスライダーで `/servo/command` 送信。Home ボタンで init_angle へ一括復帰 |
+| Face | 表情 ID（`/expression`）・音声発話（`/speech/say`）送信 |
+| Config | ESP32 config の表示・編集。Modes・Servo・Drive(DC)・Encoder・Advanced（ピン/WiFi）を GUI で操作。Advanced はステージ制で一括 POST |
+| Log | brain から受信したメッセージの一覧・フィルタ・手動 JSON 送信 |
 
-すべての送受信は smabo-brain を経由します（ESP32 へ直接は接続しません）。
+Drive / Sensors / Arm の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。

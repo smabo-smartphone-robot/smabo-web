@@ -11,16 +11,16 @@ import { Log } from './tabs/Log';
 type TabId = 'drive' | 'sensors' | 'arm' | 'face' | 'config' | 'log';
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'drive',   label: 'Drive' },
-  { id: 'sensors', label: 'Sensors' },
-  { id: 'arm',     label: 'Arm' },
   { id: 'face',    label: 'Face' },
+  { id: 'sensors', label: 'Sensors' },
+  { id: 'drive',   label: 'two wheel mobile robot' },
+  { id: 'arm',     label: 'Servo' },
   { id: 'config',  label: 'Config' },
   { id: 'log',     label: 'Log' },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('drive');
+  const [activeTab, setActiveTab] = useState<TabId>('face');
 
   return (
     <>

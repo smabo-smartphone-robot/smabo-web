@@ -31,3 +31,8 @@ export interface CompressedImageMsg {
   format: string;
   data: string; // base64 JPEG
 }
+
+// std_msgs/String — e.g. /speech/recognized (app が認識した発話)
+export interface StringMsg {
+  data: string;
+}

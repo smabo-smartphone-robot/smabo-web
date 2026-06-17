@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { brain } from '../ws/brain';
 import { esp32 } from '../ws/esp32';
-import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, CompressedImageMsg, Quat } from '../ws/types';
+import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, CompressedImageMsg, StringMsg, Quat } from '../ws/types';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
 
@@ -60,8 +60,15 @@ interface BrainStore {
   gps: { lat: number; lon: number; alt: number; accuracy: number | null } | null;
   cameraJpeg: string | null;
 
+  // App からの文字列（/speech/recognized など、新しいものが先頭）
+  recognized: { text: string; t: number }[];
+
   // Config
   esp32Config: Record<string, unknown> | null;
+
+  // ESP32 通信確認
+  esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果
+  lastEsp32WsAt: number | null; // ESP32 由来テレメトリ（/odom・/joint_states）を最後に受信した時刻
 
   // Log
   logs: LogEntry[];
@@ -74,6 +81,8 @@ interface BrainStore {
   connect(): void;
   setEsp32Host(h: string): void;
   refreshConfig(): void;
+  pingEsp32(): void;
+  clearRecognized(): void;
   clearTrail(): void;
   addLog(entry: Omit<LogEntry, 'id'>): void;
   clearLogs(): void;
@@ -112,8 +121,21 @@ export const useBrain = create<BrainStore>((set, get) => {
           return {
             odom: { vx, wz, x, y, th },
             trail: trimmed,
+            // /odom は brain が ESP32 の /wheel_vel から積分したもの = ESP32→brain→web 経路が生きている証拠
+            lastEsp32WsAt: Date.now(),
           };
         });
+      } else if (topic === '/joint_states') {
+        // ESP32 が送るサーボ状態。中身は使わないが通信生存の指標にする
+        set({ lastEsp32WsAt: Date.now() });
+      } else if (topic === '/speech/recognized') {
+        const m = msg.msg as StringMsg;
+        const text = typeof m?.data === 'string' ? m.data : '';
+        if (text) {
+          set(s => ({
+            recognized: [{ text, t: Date.now() }, ...s.recognized].slice(0, 50),
+          }));
+        }
       } else if (topic === '/imu/data') {
         const m = msg.msg as ImuMsg;
         const euler = toEuler(m.orientation);
@@ -192,7 +214,12 @@ export const useBrain = create<BrainStore>((set, get) => {
     gps: null,
     cameraJpeg: null,
 
+    recognized: [],
+
     esp32Config: null,
+
+    esp32Ping: null,
+    lastEsp32WsAt: null,
 
     logs: [],
     toasts: [],
@@ -218,6 +245,20 @@ export const useBrain = create<BrainStore>((set, get) => {
         })
         .catch(() => get().addToast('Config 取得失敗', 'err'));
     },
+
+    pingEsp32: () => {
+      esp32.ping()
+        .then(latencyMs => {
+          set({ esp32Ping: { ok: true, latencyMs, at: Date.now() } });
+          get().addToast(`ESP32 応答 ${latencyMs}ms`, 'ok');
+        })
+        .catch(() => {
+          set({ esp32Ping: { ok: false, latencyMs: -1, at: Date.now() } });
+          get().addToast('ESP32 応答なし', 'err');
+        });
+    },
+
+    clearRecognized: () => set({ recognized: [] }),
 
     clearTrail: () => set({ trail: [] }),
 

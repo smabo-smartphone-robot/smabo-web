@@ -799,6 +799,75 @@ details[open] summary::before {
   border-color: var(--border);
 }
 
+/* ===== Recognized speech (app → web) ===== */
+.recognized-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.recognized-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: .85rem;
+  padding: 4px 8px;
+  background: var(--bg3);
+  border-radius: 4px;
+}
+
+.recognized-time {
+  font-size: .7rem;
+  color: var(--dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.recognized-text {
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ===== Gaze pad (web → app, /look_at) ===== */
+.gaze-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.gaze-center-btn {
+  font-size: .72rem;
+  padding: 3px 12px;
+}
+
+/* ===== ESP32 comm check ===== */
+.esp32-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.esp32-check-label {
+  font-size: .8rem;
+  color: var(--dim);
+  min-width: 170px;
+}
+
+.esp32-check-val {
+  font-size: .82rem;
+  color: var(--text);
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-dot.err {
+  background: var(--accent);
+}
+
 /* ===== Misc ===== */
 .msg-rate {
   font-size: .75rem;

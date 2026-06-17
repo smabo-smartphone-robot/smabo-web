@@ -27,6 +27,14 @@ class Esp32Client {
     return r.json() as Promise<ConfigObj>;
   }
 
+  /** GET /config への到達性を確認し、往復時間 (ms) を返す。到達不可なら throw。 */
+  async ping(): Promise<number> {
+    const t0 = performance.now();
+    const r = await fetch(`${this.base()}/config`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`GET /config ${r.status}`);
+    return Math.round(performance.now() - t0);
+  }
+
   async setConfig(patch: ConfigObj): Promise<void> {
     const r = await fetch(`${this.base()}/config`, {
       method: 'POST',

@@ -1,6 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
+
+// ── ESP32 通信確認 ───────────────────────────────────────────
+// 2 経路を確認する:
+//   1. REST（web → ESP32 直通）: GET /config への ping
+//   2. WS テレメトリ（ESP32 → brain → web）: /odom・/joint_states の受信鮮度
+function Esp32CommCheck() {
+  const esp32Host = useBrain(s => s.esp32Host);
+  const esp32Ping = useBrain(s => s.esp32Ping);
+  const lastEsp32WsAt = useBrain(s => s.lastEsp32WsAt);
+  const pingEsp32 = useBrain(s => s.pingEsp32);
+
+  // 受信鮮度の表示を毎秒更新するための再描画トリガ
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const wsAgeSec = lastEsp32WsAt != null ? (Date.now() - lastEsp32WsAt) / 1000 : null;
+  const wsLive = wsAgeSec != null && wsAgeSec < 3;
+
+  const restDot = esp32Ping == null ? '' : esp32Ping.ok ? 'live' : 'err';
+  const restText = esp32Ping == null
+    ? '未確認'
+    : esp32Ping.ok
+      ? `OK ${esp32Ping.latencyMs}ms`
+      : '応答なし';
+
+  return (
+    <div className="card esp32-check">
+      <div className="card-title">ESP32 通信確認</div>
+
+      <div className="esp32-check-row">
+        <span className={`live-dot ${restDot}`} />
+        <span className="esp32-check-label">REST (GET /config)</span>
+        <span className="esp32-check-val">{restText}</span>
+        <button
+          style={{ fontSize: '.72rem', padding: '2px 10px' }}
+          disabled={!esp32Host}
+          onClick={pingEsp32}
+        >Ping</button>
+      </div>
+
+      <div className="esp32-check-row">
+        <span className={`live-dot ${wsLive ? 'live' : ''}`} />
+        <span className="esp32-check-label">テレメトリ (brain 経由)</span>
+        <span className="esp32-check-val">
+          {wsAgeSec == null ? '未受信' : wsLive ? `受信中 (${wsAgeSec.toFixed(1)}s 前)` : `停止 (${wsAgeSec.toFixed(0)}s 前)`}
+        </span>
+      </div>
+
+      {!esp32Host && (
+        <div className="expr-hint" style={{ marginTop: 4 }}>
+          ヘッダーで ESP32 ホストを設定すると Ping できます。
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── field components ─────────────────────────────────────────
 
@@ -83,9 +142,12 @@ export function Config() {
 
   if (!esp32Config) {
     return (
-      <div className="no-data" style={{ padding: 16, gap: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <span>Config 未受信（ヘッダーで ESP32 ホストを設定）</span>
-        <button onClick={refreshConfig}>Get config</button>
+      <div className="config-layout">
+        <Esp32CommCheck />
+        <div className="no-data" style={{ padding: 16, gap: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <span>Config 未受信（ヘッダーで ESP32 ホストを設定）</span>
+          <button onClick={refreshConfig}>Get config</button>
+        </div>
       </div>
     );
   }
@@ -117,6 +179,8 @@ export function Config() {
 
   return (
     <div className="config-layout">
+
+      <Esp32CommCheck />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         <button onClick={refreshConfig}>Get config</button>
