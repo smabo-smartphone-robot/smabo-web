@@ -73,7 +73,7 @@ export function Sensors() {
             ))}
           </>
         ) : (
-          <div className="no-data">データなし</div>
+          <div className="no-data">No data</div>
         )}
       </div>
     );
@@ -104,12 +104,12 @@ export function Sensors() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <button style={{ width: '100%', fontSize: '.75rem' }}>Google Maps で開く</button>
+                <button style={{ width: '100%', fontSize: '.75rem' }}>Open in Google Maps</button>
               </a>
             </div>
           </>
         ) : (
-          <div className="no-data">データなし</div>
+          <div className="no-data">No data</div>
         )}
       </div>
     );
@@ -128,7 +128,7 @@ export function Sensors() {
             alt="camera"
           />
         ) : (
-          <div className="camera-placeholder">カメラ映像なし</div>
+          <div className="camera-placeholder">No camera feed</div>
         )}
       </div>
     );

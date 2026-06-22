@@ -24,14 +24,14 @@ function Esp32CommCheck() {
 
   const restDot = esp32Ping == null ? '' : esp32Ping.ok ? 'live' : 'err';
   const restText = esp32Ping == null
-    ? '未確認'
+    ? 'Not checked'
     : esp32Ping.ok
       ? `OK ${esp32Ping.latencyMs}ms`
-      : '応答なし';
+      : 'No response';
 
   return (
     <div className="card esp32-check">
-      <div className="card-title">ESP32 通信確認</div>
+      <div className="card-title">ESP32 connection check</div>
 
       <div className="esp32-check-row">
         <span className={`live-dot ${restDot}`} />
@@ -46,15 +46,15 @@ function Esp32CommCheck() {
 
       <div className="esp32-check-row">
         <span className={`live-dot ${wsLive ? 'live' : ''}`} />
-        <span className="esp32-check-label">テレメトリ (brain 経由)</span>
+        <span className="esp32-check-label">Telemetry (via brain)</span>
         <span className="esp32-check-val">
-          {wsAgeSec == null ? '未受信' : wsLive ? `受信中 (${wsAgeSec.toFixed(1)}s 前)` : `停止 (${wsAgeSec.toFixed(0)}s 前)`}
+          {wsAgeSec == null ? 'Not received' : wsLive ? `Receiving (${wsAgeSec.toFixed(1)}s ago)` : `Stopped (${wsAgeSec.toFixed(0)}s ago)`}
         </span>
       </div>
 
       {!esp32Host && (
         <div className="expr-hint" style={{ marginTop: 4 }}>
-          ヘッダーで ESP32 ホストを設定すると Ping できます。
+          Set the ESP32 host in the header to enable Ping.
         </div>
       )}
     </div>
@@ -88,7 +88,7 @@ function NumField({ label, value, onSend, isInt }: {
       <input type="number" value={local} step={isInt ? 1 : 'any'}
         onChange={e => setLocal(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') send(); }} />
-      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={send}>送信</button>
+      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={send}>Send</button>
     </div>
   );
 }
@@ -103,7 +103,7 @@ function StrField({ label, value, onSend, isPassword }: {
       <input type={isPassword ? 'password' : 'text'} value={local}
         onChange={e => setLocal(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onSend(local); }} />
-      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={() => onSend(local)}>送信</button>
+      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={() => onSend(local)}>Send</button>
     </div>
   );
 }
@@ -145,7 +145,7 @@ export function Config() {
       <div className="config-layout">
         <Esp32CommCheck />
         <div className="no-data" style={{ padding: 16, gap: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span>Config 未受信（ヘッダーで ESP32 ホストを設定）</span>
+          <span>Config not received (set the ESP32 host in the header)</span>
           <button onClick={refreshConfig}>Get config</button>
         </div>
       </div>
@@ -230,10 +230,10 @@ export function Config() {
                   <button
                     style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent', fontSize: '.72rem', marginTop: 4 }}
                     onClick={() => {
-                      if (!confirm(`"${name}" を削除しますか？`)) return;
+                      if (!confirm(`Delete "${name}"?`)) return;
                       removeConfig({ servos: { joints: { [name]: null } } });
                     }}
-                  >削除</button>
+                  >Delete</button>
                 </div>
               </details>
             );
@@ -243,7 +243,7 @@ export function Config() {
             const name = prompt('Joint name:');
             if (!name) return;
             patch({ servos: { joints: { [name]: { channel: 0, min_angle: -90, max_angle: 90, init_angle: 0, max_speed: 90, min_us: 500, max_us: 2500 } } } });
-          }}>+ サーボ追加</button>
+          }}>+ Add servo</button>
         </div>
       </details>
 
@@ -299,7 +299,7 @@ export function Config() {
                 <button
                   style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent', fontSize: '.72rem', marginTop: 4 }}
                   onClick={() => patch({ servos: { random_groups: rgroups.filter(gg => s(gg['name']) !== gn) } })}
-                >グループ削除</button>
+                >Delete group</button>
               </div>
             );
           })}
@@ -307,7 +307,7 @@ export function Config() {
             const name = prompt('Group name:');
             if (!name) return;
             patch({ servos: { random_groups: [...rgroups, { name, joints: [], interval: [1, 3] }] } });
-          }}>+ グループ追加</button>
+          }}>+ Add group</button>
         </div>
       </details>
 
@@ -336,7 +336,7 @@ export function Config() {
             onSend={v => patch({ encoder: { odom_frame: v } })} />
           <StrField label="base_frame" value={s(enc['base_frame'], 'base_footprint')}
             onSend={v => patch({ encoder: { base_frame: v } })} />
-          <div style={{ fontSize: '.75rem', color: 'var(--dim)', margin: '6px 0 2px' }}>covariance (smabo-brain 側で付与)</div>
+          <div style={{ fontSize: '.75rem', color: 'var(--dim)', margin: '6px 0 2px' }}>covariance (applied on smabo-brain side)</div>
           {(['pose_xx','pose_yy','pose_aa','twist_vv','twist_ww'] as const).map(f => (
             <NumField key={f} label={f} value={n(encCov[f], 0.001)}
               onSend={v => patch({ encoder: { covariance: { [f]: v } } })} />
@@ -349,10 +349,10 @@ export function Config() {
         <summary>Advanced – pins / bus / WiFi ⚠️ reboot</summary>
         <div className="config-section">
           <div style={{ color: 'var(--orange)', fontSize: '.75rem', marginBottom: 8 }}>
-            変更は Stage → Apply で一括送信（ESP32 再起動）。WiFi 変更は接続断の可能性あり。
+            Changes are batched via Stage → Apply (ESP32 reboots). WiFi changes may drop the connection.
           </div>
           {stagedCount > 0 && (
-            <div className="staged-notice">{stagedCount} フィールドがステージ済み</div>
+            <div className="staged-notice">{stagedCount} field(s) staged</div>
           )}
 
           <div className="config-sub">I2C</div>

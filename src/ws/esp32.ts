@@ -16,7 +16,7 @@ class Esp32Client {
   /** host を正規化したベース URL（"ip" / "ip:port" / "http://ip" を許容） */
   private base(): string {
     let h = this.host.trim();
-    if (!h) throw new Error('ESP32 ホスト未設定');
+    if (!h) throw new Error('ESP32 host not set');
     if (!/^https?:\/\//.test(h)) h = `http://${h}`;
     return h.replace(/\/+$/, '');
   }

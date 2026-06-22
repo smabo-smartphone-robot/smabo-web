@@ -181,13 +181,13 @@ export const useBrain = create<BrainStore>((set, get) => {
   brain.onStatus((s: ConnStatus) => {
     set({ status: s });
     if (s === 'connected') {
-      get().addLog({ type: 'info', text: 'Brain 接続完了' });
-      get().addToast('Brain 接続完了', 'ok');
+      get().addLog({ type: 'info', text: 'Brain connected' });
+      get().addToast('Brain connected', 'ok');
     } else if (s === 'disconnected') {
-      get().addLog({ type: 'info', text: 'Brain 切断' });
-      get().addToast('Brain 切断');
+      get().addLog({ type: 'info', text: 'Brain disconnected' });
+      get().addToast('Brain disconnected');
     } else if (s === 'error') {
-      get().addToast('接続エラー', 'err');
+      get().addToast('Connection error', 'err');
     }
   });
 
@@ -241,20 +241,20 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.getConfig()
         .then(config => {
           set({ esp32Config: config });
-          get().addToast('Config 取得', 'ok');
+          get().addToast('Config loaded', 'ok');
         })
-        .catch(() => get().addToast('Config 取得失敗', 'err'));
+        .catch(() => get().addToast('Failed to load config', 'err'));
     },
 
     pingEsp32: () => {
       esp32.ping()
         .then(latencyMs => {
           set({ esp32Ping: { ok: true, latencyMs, at: Date.now() } });
-          get().addToast(`ESP32 応答 ${latencyMs}ms`, 'ok');
+          get().addToast(`ESP32 responded ${latencyMs}ms`, 'ok');
         })
         .catch(() => {
           set({ esp32Ping: { ok: false, latencyMs: -1, at: Date.now() } });
-          get().addToast('ESP32 応答なし', 'err');
+          get().addToast('ESP32 no response', 'err');
         });
     },
 
@@ -289,20 +289,20 @@ export const useBrain = create<BrainStore>((set, get) => {
         esp32Config: s.esp32Config ? deepMerge(s.esp32Config, patch) : patch,
       }));
       esp32.setConfig(patch)
-        .catch(() => get().addToast('Config 送信失敗', 'err'));
+        .catch(() => get().addToast('Failed to send config', 'err'));
     },
 
     removeConfig: (patch) => {
       // 削除（null 値）は楽観反映せず、送信後に再取得して正とする
       esp32.setConfig(patch)
         .then(() => get().refreshConfig())
-        .catch(() => get().addToast('Config 送信失敗', 'err'));
+        .catch(() => get().addToast('Failed to send config', 'err'));
     },
 
     setMode: (modes) => {
       esp32.setMode(modes)
         .then(() => get().refreshConfig())
-        .catch(() => get().addToast('Mode 送信失敗', 'err'));
+        .catch(() => get().addToast('Failed to send mode', 'err'));
     },
   };
 });

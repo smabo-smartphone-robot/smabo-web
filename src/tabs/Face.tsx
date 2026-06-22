@@ -44,7 +44,7 @@ export function Face() {
   };
 
   const fmtTime = (t: number) =>
-    new Date(t).toLocaleTimeString('ja-JP', { hour12: false });
+    new Date(t).toLocaleTimeString('en-GB', { hour12: false });
 
   return (
     <div className="face-layout">
@@ -52,13 +52,13 @@ export function Face() {
       {/* Recognized speech (app → web) */}
       <div className="card">
         <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>認識した音声（アプリから受信）</span>
+          <span>Recognized speech (from app)</span>
           {recognized.length > 0 && (
             <button onClick={clearRecognized} style={{ fontSize: '.7rem', padding: '2px 8px' }}>Clear</button>
           )}
         </div>
         {recognized.length === 0 ? (
-          <div className="no-data">まだ受信していません（/speech/recognized）</div>
+          <div className="no-data">Nothing received yet (/speech/recognized)</div>
         ) : (
           <div className="recognized-list">
             {recognized.map((r, i) => (
@@ -73,9 +73,9 @@ export function Face() {
 
       {/* Gaze control (web → app, /look_at) */}
       <div className="card">
-        <div className="card-title">視線コントロール</div>
+        <div className="card-title">Gaze control</div>
         <div className="expr-hint" style={{ marginBottom: 8 }}>
-          アプリの目を <b>Follow</b> モードにすると、このパッドで視線方向を操作できます。
+          Set the app's eyes to <b>Follow</b> mode to control the gaze direction with this pad.
         </div>
         <GazePad onGaze={(x, y) => sendLookAt(x, y)} />
       </div>
@@ -84,7 +84,7 @@ export function Face() {
       <div className="card">
         <div className="card-title">Expression</div>
         <div className="expr-row">
-          <span className="expr-hint">表情ID（アプリ側で定義した番号）</span>
+          <span className="expr-hint">Expression ID (number defined in the app)</span>
           <input
             type="number"
             min={1}
@@ -104,7 +104,7 @@ export function Face() {
         <div className="say-input-row">
           <input
             type="text"
-            placeholder="発話テキスト..."
+            placeholder="Speech text..."
             value={sayText}
             onChange={e => setSayText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSay(); }}

@@ -11,7 +11,7 @@ export function Header() {
   const refreshConfig = useBrain(s => s.refreshConfig);
 
   const isConnectedOrConnecting = status === 'connected' || status === 'connecting';
-  const btnLabel = isConnectedOrConnecting ? '切断' : '接続';
+  const btnLabel = isConnectedOrConnecting ? 'Disconnect' : 'Connect';
 
   return (
     <header>
@@ -36,7 +36,7 @@ export function Header() {
           style={{ width: 160 }}
           onKeyDown={e => { if (e.key === 'Enter') refreshConfig(); }}
         />
-        <button onClick={refreshConfig} disabled={!esp32Host}>Config取得</button>
+        <button onClick={refreshConfig} disabled={!esp32Host}>Get Config</button>
 
         <span className="msg-rate">{msgRate} msg/s</span>
       </div>

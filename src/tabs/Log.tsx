@@ -66,7 +66,7 @@ export function Log() {
       <div className="log-toolbar">
         <input
           type="text"
-          placeholder="フィルタ..."
+          placeholder="Filter..."
           value={filter}
           onChange={e => setFilter(e.target.value)}
         />
@@ -100,7 +100,7 @@ export function Log() {
             }
           }}
         />
-        <button onClick={handleSend} style={{ whiteSpace: 'nowrap' }}>送信</button>
+        <button onClick={handleSend} style={{ whiteSpace: 'nowrap' }}>Send</button>
       </div>
     </div>
   );

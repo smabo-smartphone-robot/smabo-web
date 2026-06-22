@@ -123,7 +123,7 @@ export function GazePad({ onGaze }: GazePadProps) {
         height={SIZE}
         style={{ width: SIZE, height: SIZE, cursor: 'crosshair', display: 'block', touchAction: 'none' }}
       />
-      <button className="gaze-center-btn" onClick={center}>中央に戻す</button>
+      <button className="gaze-center-btn" onClick={center}>Recenter</button>
     </div>
   );
 }

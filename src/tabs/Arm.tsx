@@ -81,15 +81,15 @@ export function Arm() {
   return (
     <div className="arm-layout">
       <div className="arm-header">
-        <button onClick={refreshConfig}>Config 取得</button>
+        <button onClick={refreshConfig}>Get Config</button>
         <button onClick={handleHome} disabled={manualServos.length === 0}>Home</button>
       </div>
 
       {manualServos.length === 0 ? (
         <div className="no-data">
           {esp32Config === null
-            ? 'ヘッダーで ESP32 ホストを設定し「Config取得」を押してください。'
-            : 'random_groups に含まれないサーボがありません。'}
+            ? 'Set the ESP32 host in the header and press "Get Config".'
+            : 'No servos outside random_groups.'}
         </div>
       ) : (
         <div className="arm-servos">
