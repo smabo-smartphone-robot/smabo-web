@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
 
@@ -9,18 +9,12 @@ import { useDragOrder } from '../hooks/useDragOrder';
 function Esp32CommCheck() {
   const esp32Host = useBrain(s => s.esp32Host);
   const esp32Ping = useBrain(s => s.esp32Ping);
-  const lastEsp32WsAt = useBrain(s => s.lastEsp32WsAt);
+  const esp32WsPing = useBrain(s => s.esp32WsPing);
+  const status = useBrain(s => s.status);
   const pingEsp32 = useBrain(s => s.pingEsp32);
+  const pingEsp32Ws = useBrain(s => s.pingEsp32Ws);
 
-  // 受信鮮度の表示を毎秒更新するための再描画トリガ
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const wsAgeSec = lastEsp32WsAt != null ? (Date.now() - lastEsp32WsAt) / 1000 : null;
-  const wsLive = wsAgeSec != null && wsAgeSec < 3;
+  const brainConnected = status === 'connected';
 
   const restDot = esp32Ping == null ? '' : esp32Ping.ok ? 'live' : 'err';
   const restText = esp32Ping == null
@@ -29,13 +23,22 @@ function Esp32CommCheck() {
       ? `OK ${esp32Ping.latencyMs}ms`
       : 'No response';
 
+  const wsPingDot = esp32WsPing == null ? '' : esp32WsPing.ok ? 'live' : 'err';
+  const wsPingText = esp32WsPing == null
+    ? 'Not checked'
+    : esp32WsPing.ok
+      ? `OK ${esp32WsPing.latencyMs}ms`
+      : 'No response';
+
   return (
     <div className="card esp32-check">
       <div className="card-title">ESP32 connection check</div>
 
       <div className="esp32-check-row">
         <span className={`live-dot ${restDot}`} />
-        <span className="esp32-check-label">REST (GET /config)</span>
+        <span className="esp32-check-label" title="web → ESP32 への HTTP 直結（GET /config）">
+          REST (web↔ESP32)
+        </span>
         <span className="esp32-check-val">{restText}</span>
         <button
           style={{ fontSize: '.72rem', padding: '2px 10px' }}
@@ -45,16 +48,22 @@ function Esp32CommCheck() {
       </div>
 
       <div className="esp32-check-row">
-        <span className={`live-dot ${wsLive ? 'live' : ''}`} />
-        <span className="esp32-check-label">Telemetry (via brain)</span>
-        <span className="esp32-check-val">
-          {wsAgeSec == null ? 'Not received' : wsLive ? `Receiving (${wsAgeSec.toFixed(1)}s ago)` : `Stopped (${wsAgeSec.toFixed(0)}s ago)`}
+        <span className={`live-dot ${wsPingDot}`} />
+        <span className="esp32-check-label"
+          title="brain 経由で /ping→/pong をエコー。web↔brain 接続済み時のみ有効なので、結果は brain↔ESP32 の WS 疎通を示す">
+          WS (brain↔ESP32)
         </span>
+        <span className="esp32-check-val">{wsPingText}</span>
+        <button
+          style={{ fontSize: '.72rem', padding: '2px 10px' }}
+          disabled={!brainConnected}
+          onClick={pingEsp32Ws}
+        >Ping</button>
       </div>
 
       {!esp32Host && (
         <div className="expr-hint" style={{ marginTop: 4 }}>
-          Set the ESP32 host in the header to enable Ping.
+          Set the ESP32 host in the header to enable REST Ping. WS ping needs the brain connected.
         </div>
       )}
     </div>
@@ -169,6 +178,7 @@ export function Config() {
   const pca        = rec(cfg['pca9685']);
   const wifi       = rec(cfg['wifi']);
   const brainCfg   = rec(cfg['brain']);
+  const lidar      = rec(cfg['lidar']);
 
   const patch = (p: Record<string, unknown>) => patchConfig(p);
   const sendMode = (m: Record<string, unknown>) => setMode(m);
@@ -190,7 +200,7 @@ export function Config() {
       <details open>
         <summary>Modes</summary>
         <div className="config-section">
-          {(['servos', 'dc_drive', 'encoder_drive'] as const).map(k => (
+          {(['servos', 'dc_drive', 'encoder_drive', 'lidar'] as const).map(k => (
             <BoolField key={k} label={k} value={b(modes[k])}
               onChange={v => sendMode({ ...modes, [k]: v })} />
           ))}
@@ -341,6 +351,26 @@ export function Config() {
             <NumField key={f} label={f} value={n(encCov[f], 0.001)}
               onSend={v => patch({ encoder: { covariance: { [f]: v } } })} />
           ))}
+        </div>
+      </details>
+
+      {/* Lidar (LD06) */}
+      <details>
+        <summary>Lidar (LD06)</summary>
+        <div className="config-section">
+          <BoolField label="lidar enabled (modes.lidar)" value={b(modes['lidar'])}
+            onChange={v => sendMode({ ...modes, lidar: v })} />
+          <div style={{ fontSize: '.75rem', color: 'var(--dim)', margin: '2px 0 6px' }}>
+            LD06 → /scan (Nav2 sensor). UART pin changes hot-reload (no reboot).
+          </div>
+          <NumField label="uart"           value={n(lidar['uart'], 1)}        isInt onSend={v => patch({ lidar: { uart: v } })} />
+          <NumField label="rx pin"         value={n(lidar['rx'], 20)}         isInt onSend={v => patch({ lidar: { rx: v } })} />
+          <NumField label="tx pin (-1=off)" value={n(lidar['tx'], -1)}        isInt onSend={v => patch({ lidar: { tx: v } })} />
+          <NumField label="baud"           value={n(lidar['baud'], 230400)}   isInt onSend={v => patch({ lidar: { baud: v } })} />
+          <StrField label="frame_id"       value={s(lidar['frame_id'], 'laser')}    onSend={v => patch({ lidar: { frame_id: v } })} />
+          <NumField label="bins"           value={n(lidar['bins'], 360)}      isInt onSend={v => patch({ lidar: { bins: v } })} />
+          <NumField label="range_min (m)"  value={n(lidar['range_min'], 0.05)}      onSend={v => patch({ lidar: { range_min: v } })} />
+          <NumField label="range_max (m)"  value={n(lidar['range_max'], 12.0)}      onSend={v => patch({ lidar: { range_max: v } })} />
         </div>
       </details>
 

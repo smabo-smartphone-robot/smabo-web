@@ -67,8 +67,8 @@ interface BrainStore {
   esp32Config: Record<string, unknown> | null;
 
   // ESP32 通信確認
-  esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果
-  lastEsp32WsAt: number | null; // ESP32 由来テレメトリ（/odom・/joint_states）を最後に受信した時刻
+  esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果（web↔ESP32）
+  esp32WsPing: { ok: boolean; latencyMs: number; at: number } | null; // WS /ping→/pong エコーの往復結果（brain↔ESP32）
 
   // Log
   logs: LogEntry[];
@@ -82,6 +82,7 @@ interface BrainStore {
   setEsp32Host(h: string): void;
   refreshConfig(): void;
   pingEsp32(): void;
+  pingEsp32Ws(): void;
   clearRecognized(): void;
   clearTrail(): void;
   addLog(entry: Omit<LogEntry, 'id'>): void;
@@ -94,6 +95,10 @@ interface BrainStore {
 }
 
 let msgCount = 0;
+
+// Pending WS ping (application-level /ping → /pong echo). Closure state so it
+// survives across messages without bloating the store.
+let wsPing: { token: string; sentAt: number; timer: ReturnType<typeof setTimeout> } | null = null;
 
 export const useBrain = create<BrainStore>((set, get) => {
   // Register handlers once at module import time
@@ -121,13 +126,17 @@ export const useBrain = create<BrainStore>((set, get) => {
           return {
             odom: { vx, wz, x, y, th },
             trail: trimmed,
-            // /odom は brain が ESP32 の /wheel_vel から積分したもの = ESP32→brain→web 経路が生きている証拠
-            lastEsp32WsAt: Date.now(),
           };
         });
-      } else if (topic === '/joint_states') {
-        // ESP32 が送るサーボ状態。中身は使わないが通信生存の指標にする
-        set({ lastEsp32WsAt: Date.now() });
+      } else if (topic === '/pong') {
+        // ESP32 からの ping エコー。token が一致したら往復時間(RTT)を確定する。
+        const m = msg.msg as StringMsg;
+        if (wsPing && m?.data === wsPing.token) {
+          const latencyMs = Math.round(performance.now() - wsPing.sentAt);
+          clearTimeout(wsPing.timer);
+          wsPing = null;
+          set({ esp32WsPing: { ok: true, latencyMs, at: Date.now() } });
+        }
       } else if (topic === '/speech/recognized') {
         const m = msg.msg as StringMsg;
         const text = typeof m?.data === 'string' ? m.data : '';
@@ -219,7 +228,7 @@ export const useBrain = create<BrainStore>((set, get) => {
     esp32Config: null,
 
     esp32Ping: null,
-    lastEsp32WsAt: null,
+    esp32WsPing: null,
 
     logs: [],
     toasts: [],
@@ -256,6 +265,27 @@ export const useBrain = create<BrainStore>((set, get) => {
           set({ esp32Ping: { ok: false, latencyMs: -1, at: Date.now() } });
           get().addToast('ESP32 no response', 'err');
         });
+    },
+
+    pingEsp32Ws: () => {
+      // 能動的な end-to-end WS ping: /ping(token) を投げ、ESP32 の /pong エコーを
+      // 待って RTT を測る（web→brain→ESP32→brain→web）。2 秒でタイムアウト。
+      if (!brain.isConnected) {
+        get().addToast('Brain not connected', 'err');
+        return;
+      }
+      const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      if (wsPing) clearTimeout(wsPing.timer);
+      const timer = setTimeout(() => {
+        if (wsPing && wsPing.token === token) {
+          wsPing = null;
+          set({ esp32WsPing: { ok: false, latencyMs: -1, at: Date.now() } });
+          get().addToast('ESP32 WS no response', 'err');
+        }
+      }, 2000);
+      wsPing = { token, sentAt: performance.now(), timer };
+      brain.publish('/ping', { data: token });   // brain が /web prefix を付与
+      get().addSentLog(`ping ${token}`);
     },
 
     clearRecognized: () => set({ recognized: [] }),
