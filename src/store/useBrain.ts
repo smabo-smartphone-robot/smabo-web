@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { brain } from '../ws/brain';
 import { esp32 } from '../ws/esp32';
-import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, CompressedImageMsg, StringMsg, Quat } from '../ws/types';
+import * as webrtc from '../rtc/webrtc';
+import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, StringMsg, Quat, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
 
@@ -58,10 +59,16 @@ interface BrainStore {
     ax: number; ay: number; az: number;
   } | null;
   gps: { lat: number; lon: number; alt: number; accuracy: number | null } | null;
-  cameraJpeg: string | null;
+  webrtcStream: MediaStream | null;
+  previewOn: boolean;          // brain→web 映像中継を要求しているか
 
   // App からの文字列（/speech/recognized など、新しいものが先頭）
   recognized: { text: string; t: number }[];
+
+  // Vision（画像処理）
+  visionConfig: VisionConfigMsg | null;        // brain が配信する現在設定スナップショット
+  detections: Detection2DArrayMsg | null;      // 直近の /vision/detections
+  visionMarkers: { text: string; t: number } | null; // 直近の /vision/markers（AR番号/QR内容）
 
   // Config
   esp32Config: Record<string, unknown> | null;
@@ -85,6 +92,8 @@ interface BrainStore {
   pingEsp32Ws(): void;
   clearRecognized(): void;
   clearTrail(): void;
+  setVisionConfig(patch: Record<string, unknown>): void;
+  setPreview(on: boolean): void;
   addLog(entry: Omit<LogEntry, 'id'>): void;
   clearLogs(): void;
   addSentLog(text: string): void;
@@ -94,13 +103,30 @@ interface BrainStore {
   setMode(modes: Record<string, unknown>): void;
 }
 
+// WebRTC は store 生成時に一度だけ初期化する。
+// setStreamCallback は set() への参照が必要なので create() の中で呼ぶ。
+
 let msgCount = 0;
+
+// High-frequency topics with large payloads are excluded from the log.
+// Camera frames (~50 KB base64) would otherwise flood it and cause per-frame
+// JSON.stringify + Zustand state updates re-rendering the Log tab.
+const LOG_SKIP_TOPICS = new Set(['/vision/detections']);
 
 // Pending WS ping (application-level /ping → /pong echo). Closure state so it
 // survives across messages without bloating the store.
 let wsPing: { token: string; sentAt: number; timer: ReturnType<typeof setTimeout> } | null = null;
 
 export const useBrain = create<BrainStore>((set, get) => {
+  // WebRTC 初期化 — brain からの中継映像 stream を store に格納
+  webrtc.init(
+    (topic, msg) => {
+      brain.publish(topic, msg);
+      get().addSentLog(topic);
+    },
+    (stream) => set({ webrtcStream: stream }),
+  );
+
   // Register handlers once at module import time
   brain.onMsg((msg: RosbridgeMsg) => {
     msgCount++;
@@ -173,18 +199,37 @@ export const useBrain = create<BrainStore>((set, get) => {
             accuracy,
           },
         });
-      } else if (topic === '/camera/image/compressed') {
-        const m = msg.msg as CompressedImageMsg;
-        set({ cameraJpeg: m.data });
+      } else if (topic === '/vision/config') {
+        // brain が保持する画像処理設定のスナップショット（起動時初期値 or 直近の上書き）。
+        // data は JSON 文字列（std_msgs/String）。
+        const m = msg.msg as StringMsg;
+        try {
+          const cfg = JSON.parse(m.data) as VisionConfigMsg;
+          set({ visionConfig: cfg });
+        } catch {
+          // ignore malformed config
+        }
+      } else if (topic === '/vision/detections') {
+        set({ detections: msg.msg as Detection2DArrayMsg });
+      } else if (topic === '/vision/markers') {
+        const m = msg.msg as StringMsg;
+        const text = typeof m?.data === 'string' ? m.data : '';
+        if (text) set({ visionMarkers: { text, t: Date.now() } });
+      } else if (topic === '/webrtc/web_offer') {
+        // brain が中継映像を offer してきた → answer を返す
+        const m = msg.msg as StringMsg;
+        if (m?.data) webrtc.handleBrainOffer(m.data);
       }
     }
 
-    // Add to log
-    get().addLog({
-      type: 'recv',
-      text: JSON.stringify(msg),
-      topic: msg.topic,
-    });
+    // Add to log (skip high-frequency / large topics to avoid render overhead)
+    if (!msg.topic || !LOG_SKIP_TOPICS.has(msg.topic)) {
+      get().addLog({
+        type: 'recv',
+        text: JSON.stringify(msg),
+        topic: msg.topic,
+      });
+    }
   });
 
   brain.onStatus((s: ConnStatus) => {
@@ -195,6 +240,8 @@ export const useBrain = create<BrainStore>((set, get) => {
     } else if (s === 'disconnected') {
       get().addLog({ type: 'info', text: 'Brain disconnected' });
       get().addToast('Brain disconnected');
+      webrtc.close();
+      set({ previewOn: false, webrtcStream: null });
     } else if (s === 'error') {
       get().addToast('Connection error', 'err');
     }
@@ -221,9 +268,14 @@ export const useBrain = create<BrainStore>((set, get) => {
 
     imu: null,
     gps: null,
-    cameraJpeg: null,
+    webrtcStream: null,
+    previewOn: false,
 
     recognized: [],
+
+    visionConfig: null,
+    detections: null,
+    visionMarkers: null,
 
     esp32Config: null,
 
@@ -291,6 +343,29 @@ export const useBrain = create<BrainStore>((set, get) => {
     clearRecognized: () => set({ recognized: [] }),
 
     clearTrail: () => set({ trail: [] }),
+
+    setVisionConfig: (patch) => {
+      // 部分設定を /vision/config（std_msgs/String の data に JSON）で送る。
+      // brain が現在値に deep-merge し、正規化済みスナップショットを全 UI に返すので
+      // 受信ハンドラ側で visionConfig が更新される（楽観反映＋確定）。
+      set(s => ({
+        visionConfig: s.visionConfig
+          ? (deepMerge(
+              s.visionConfig as unknown as Record<string, unknown>,
+              patch,
+            ) as unknown as VisionConfigMsg)
+          : s.visionConfig,
+      }));
+      brain.publish('/vision/config', { data: JSON.stringify(patch) });
+      get().addSentLog(`vision/config ${JSON.stringify(patch)}`);
+    },
+
+    setPreview: (on) => {
+      // brain→web の映像中継を要求/停止。on のとき brain が web_offer を返す。
+      webrtc.setPreview(on);
+      set({ previewOn: on });
+      if (!on) set({ webrtcStream: null });
+    },
 
     addLog: (entry) => {
       const id = Date.now() + Math.random();

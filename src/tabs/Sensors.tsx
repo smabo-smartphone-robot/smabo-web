@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
 
@@ -22,10 +23,18 @@ const SENSOR_KEYS = ['imu', 'gps', 'camera'] as const;
 type SK = (typeof SENSOR_KEYS)[number];
 
 export function Sensors() {
-  const imu = useBrain(s => s.imu);
-  const gps = useBrain(s => s.gps);
-  const cameraJpeg = useBrain(s => s.cameraJpeg);
+  const imu          = useBrain(s => s.imu);
+  const gps          = useBrain(s => s.gps);
+  const status       = useBrain(s => s.status);
+  const webrtcStream = useBrain(s => s.webrtcStream);
+  const previewOn    = useBrain(s => s.previewOn);
+  const setPreview   = useBrain(s => s.setPreview);
+  const videoRef     = useRef<HTMLVideoElement>(null);
   const { sort, handleProps, dropProps } = useDragOrder('smabo-sensors-order');
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = webrtcStream;
+  }, [webrtcStream]);
 
   const fmt = (v: number, d = 2) => v.toFixed(d);
   const sorted = sort(SENSOR_KEYS) as SK[];
@@ -119,16 +128,23 @@ export function Sensors() {
         <div className="sensor-header">
           <span className="drag-handle" {...hdl}>⠿</span>
           <span className="sensor-title">Camera</span>
-          <div className={`live-dot ${cameraJpeg ? 'live' : ''}`} />
+          <button
+            style={{ marginLeft: 'auto', fontSize: '.7rem', padding: '2px 8px' }}
+            disabled={status !== 'connected'}
+            onClick={() => setPreview(!previewOn)}
+          >
+            {previewOn ? '■ プレビュー停止' : '▶ プレビュー'}
+          </button>
+          <div className={`live-dot ${webrtcStream ? 'live' : ''}`} />
         </div>
-        {cameraJpeg ? (
-          <img
-            className="camera-img"
-            src={`data:image/jpeg;base64,${cameraJpeg}`}
-            alt="camera"
-          />
+        {webrtcStream ? (
+          <video ref={videoRef} className="camera-img" autoPlay playsInline muted />
         ) : (
-          <div className="camera-placeholder">No camera feed</div>
+          <div className="camera-placeholder">
+            {status !== 'connected'
+              ? 'No camera feed'
+              : previewOn ? 'Connecting preview…' : 'プレビューはOFFです'}
+          </div>
         )}
       </div>
     );

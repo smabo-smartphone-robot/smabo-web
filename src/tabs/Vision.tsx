@@ -1,0 +1,360 @@
+import { useRef, useEffect } from 'react';
+import { useBrain } from '../store/useBrain';
+
+const MODES = ['off', 'aruco', 'color', 'face', 'qr'] as const;
+const ARUCO_DICTS = [
+  'ALL',
+  'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250',
+  'DICT_5X5_50', 'DICT_5X5_100', 'DICT_5X5_250',
+  'DICT_6X6_50', 'DICT_6X6_100', 'DICT_6X6_250',
+  'DICT_7X7_50', 'DICT_APRILTAG_36h11', 'DICT_ARUCO_ORIGINAL',
+] as const;
+
+const arucoDictLabel = (d: string) => (d === 'ALL' ? 'ALL (any dictionary, slower)' : d);
+
+const clamp255 = (c: number) => Math.max(0, Math.min(255, Math.round(c)));
+const rgbToHex = (rgb: number[] | null) =>
+  rgb && rgb.length === 3
+    ? '#' + rgb.map(c => clamp255(c).toString(16).padStart(2, '0')).join('')
+    : '#ff0000';
+const hexToRgb = (hex: string): number[] => {
+  const s = hex.replace('#', '');
+  return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+};
+
+export function Vision() {
+  const status       = useBrain(s => s.status);
+  const cfg          = useBrain(s => s.visionConfig);
+  const detections   = useBrain(s => s.detections);
+  const markers      = useBrain(s => s.visionMarkers);
+  const setVisionConfig = useBrain(s => s.setVisionConfig);
+  const webrtcStream = useBrain(s => s.webrtcStream);
+  const previewOn    = useBrain(s => s.previewOn);
+  const setPreview   = useBrain(s => s.setPreview);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = webrtcStream;
+  }, [webrtcStream]);
+
+  const connected = status === 'connected';
+
+  // brain がスナップショットを送る前（未接続 / 受信前）はフォームを出せない。
+  if (!cfg) {
+    return (
+      <div className="vision-layout">
+        <div className="card">
+          <div className="card-title">Vision</div>
+          <div className="no-data">
+            {connected
+              ? 'Waiting for /vision/config snapshot from brain…'
+              : 'Connect to the brain to configure vision.'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const fmtPct = (cx: number, w: number) => `${(cx / (w || 1)) * 100}%`;
+  const imgW = detections?.source_img_width ?? 0;
+  const imgH = detections?.source_img_height ?? 0;
+
+  return (
+    <div className="vision-layout">
+
+      {/* ── Detection settings ─────────────────────────── */}
+      <div className="card">
+        <div className="card-title">Detection</div>
+
+        <div className="config-field">
+          <label>Enabled</label>
+          <input
+            type="checkbox"
+            checked={cfg.enabled}
+            onChange={e => setVisionConfig({ enabled: e.target.checked })}
+          />
+        </div>
+
+        <div className="config-field">
+          <label>Mode</label>
+          <select value={cfg.mode} onChange={e => setVisionConfig({ mode: e.target.value })}>
+            {MODES.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+
+        {cfg.mode === 'color' && (
+          <>
+            <div className="config-field">
+              <label>Target color</label>
+              <input
+                type="color"
+                value={rgbToHex(cfg.color_rgb)}
+                onChange={e => setVisionConfig({ color_rgb: hexToRgb(e.target.value) })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Hue tolerance</label>
+              <input
+                type="range"
+                min={4} max={40} step={1}
+                value={cfg.color_hue_tol}
+                onChange={e => setVisionConfig({ color_hue_tol: Number(e.target.value) })}
+              />
+              <span className="val">{cfg.color_hue_tol}</span>
+            </div>
+            <div className="config-field">
+              <label>Min saturation</label>
+              <input
+                type="range"
+                min={0} max={255} step={5}
+                value={cfg.color_s_min}
+                onChange={e => setVisionConfig({ color_s_min: Number(e.target.value) })}
+              />
+              <span className="val">{cfg.color_s_min}</span>
+            </div>
+            <div className="config-field">
+              <label>Min brightness</label>
+              <input
+                type="range"
+                min={0} max={255} step={5}
+                value={cfg.color_v_min}
+                onChange={e => setVisionConfig({ color_v_min: Number(e.target.value) })}
+              />
+              <span className="val">{cfg.color_v_min}</span>
+            </div>
+          </>
+        )}
+
+        {cfg.mode === 'aruco' && (
+          <>
+            <div className="config-field">
+              <label>Marker dictionary</label>
+              <select
+                value={cfg.aruco_dict}
+                onChange={e => setVisionConfig({ aruco_dict: e.target.value })}
+              >
+                {ARUCO_DICTS.map(d => <option key={d} value={d}>{arucoDictLabel(d)}</option>)}
+              </select>
+            </div>
+            <div className="config-field">
+              <label>Target marker ID</label>
+              <input
+                type="text"
+                placeholder="(any = largest)"
+                value={cfg.target_marker_id ?? ''}
+                onChange={e => {
+                  const v = e.target.value.trim();
+                  setVisionConfig({ target_marker_id: v === '' ? null : v });
+                }}
+              />
+            </div>
+            <div className="expr-hint">
+              印刷したマーカーの辞書を選んでください。分からない場合は <b>ALL</b> で全辞書を走査します（少し重く、誤検出が増えることがあります）。
+            </div>
+          </>
+        )}
+
+        <div className="config-field">
+          <label>Speak detected text</label>
+          <input
+            type="checkbox"
+            checked={cfg.speak}
+            onChange={e => setVisionConfig({ speak: e.target.checked })}
+          />
+        </div>
+
+        <div className="config-field">
+          <label>Camera HFOV (deg)</label>
+          <input
+            type="number"
+            min={10} max={180} step={1}
+            value={cfg.hfov_deg}
+            onChange={e => setVisionConfig({ hfov_deg: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="config-field">
+          <label>Detection rate (fps)</label>
+          <input
+            type="range"
+            min={1} max={30} step={1}
+            value={cfg.capture_fps ?? 5}
+            onChange={e => setVisionConfig({ capture_fps: Number(e.target.value) })}
+          />
+          <span className="val">{cfg.capture_fps ?? 5} fps</span>
+        </div>
+        <div className="expr-hint" style={{ marginTop: -4, marginBottom: 8 }}>
+          ブラウザからブレインへ送るフレーム頻度。高いほど目線・首・走行の追従が滑らかになりますが、通信量と CPU 負荷が増えます。
+        </div>
+
+        <div className="config-field">
+          <label>Min size</label>
+          <input
+            type="range"
+            min={0} max={10} step={0.05}
+            value={+(cfg.min_area_frac * 100).toFixed(2)}
+            onChange={e => setVisionConfig({ min_area_frac: Number(e.target.value) / 100 })}
+          />
+          <span className="val">
+            {(() => {
+              if (imgW > 0 && imgH > 0) {
+                const side = Math.round(Math.sqrt(cfg.min_area_frac * imgW * imgH));
+                return `短辺≥${side}px`;
+              }
+              return `${(cfg.min_area_frac * 100).toFixed(2)}%`;
+            })()}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Behaviors ──────────────────────────────────── */}
+      <div className="card">
+        <div className="card-title">Behaviors</div>
+        <div className="expr-hint" style={{ marginBottom: 8 }}>
+          検出した方向を、目線・首サーボ・走行のどれに反映するか個別に選びます。
+        </div>
+
+        <div className="config-field">
+          <label>Gaze (/look_at)</label>
+          <input
+            type="checkbox"
+            checked={cfg.behaviors.look_at}
+            onChange={e => setVisionConfig({ behaviors: { look_at: e.target.checked } })}
+          />
+        </div>
+        <div className="config-field">
+          <label>Neck servo (/servo/command)</label>
+          <input
+            type="checkbox"
+            checked={cfg.behaviors.servo}
+            onChange={e => setVisionConfig({ behaviors: { servo: e.target.checked } })}
+          />
+        </div>
+        <div className="config-field">
+          <label>Drive follow (/cmd_vel)</label>
+          <input
+            type="checkbox"
+            checked={cfg.behaviors.drive}
+            onChange={e => setVisionConfig({ behaviors: { drive: e.target.checked } })}
+          />
+        </div>
+
+        {cfg.behaviors.servo && (
+          <>
+            <div className="config-field">
+              <label>Pan joint</label>
+              <input
+                type="text"
+                value={cfg.target_joints.pan}
+                onChange={e => setVisionConfig({ target_joints: { pan: e.target.value } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Servo gain</label>
+              <input
+                type="number"
+                min={0} max={5} step={0.1}
+                value={cfg.target_joints.gain}
+                onChange={e => setVisionConfig({ target_joints: { gain: Number(e.target.value) } })}
+              />
+            </div>
+          </>
+        )}
+
+        {cfg.behaviors.drive && (
+          <>
+            <div className="config-field">
+              <label>Target size (frac)</label>
+              <input
+                type="number"
+                min={0.01} max={0.9} step={0.01}
+                value={cfg.drive.target_area_frac}
+                onChange={e => setVisionConfig({ drive: { target_area_frac: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Max linear (m/s)</label>
+              <input
+                type="number"
+                min={0.0} max={1.0} step={0.01}
+                value={cfg.drive.max_lin}
+                onChange={e => setVisionConfig({ drive: { max_lin: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Max angular (rad/s)</label>
+              <input
+                type="number"
+                min={0.0} max={3.0} step={0.1}
+                value={cfg.drive.max_ang}
+                onChange={e => setVisionConfig({ drive: { max_ang: Number(e.target.value) } })}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Live detections ────────────────────────────── */}
+      <div className="card vision-preview">
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center' }}>
+          <span>Detections</span>
+          <button
+            style={{ marginLeft: 'auto', fontSize: '.7rem', padding: '2px 8px' }}
+            disabled={!connected}
+            onClick={() => setPreview(!previewOn)}
+          >
+            {previewOn ? '■ プレビュー停止' : '▶ プレビュー'}
+          </button>
+        </div>
+        <div className="vision-frame">
+          {webrtcStream ? (
+            <video ref={videoRef} className="camera-img" autoPlay playsInline muted />
+          ) : (
+            <div className="camera-placeholder">
+              {!connected
+                ? 'Connect to brain to view camera'
+                : previewOn ? 'Connecting preview…' : 'プレビューはOFFです（検出は動作中）'}
+            </div>
+          )}
+          {imgW > 0 && imgH > 0 && detections?.detections.map((d, i) => {
+            const b = d.bbox;
+            const left = fmtPct(b.center.position.x - b.size_x / 2, imgW);
+            const top = fmtPct(b.center.position.y - b.size_y / 2, imgH);
+            const w = fmtPct(b.size_x, imgW);
+            const h = fmtPct(b.size_y, imgH);
+            const label = d.results[0]?.hypothesis.class_id ?? '?';
+            return (
+              <div key={i} className="vision-bbox" style={{ left, top, width: w, height: h }}>
+                <span className="vision-bbox-label">{label}</span>
+              </div>
+            );
+          })}
+          {imgW > 0 && imgH > 0 && cfg.min_area_frac > 0 && (() => {
+            const side = Math.sqrt(cfg.min_area_frac * imgW * imgH);
+            return (
+              <div
+                className="vision-min-size"
+                style={{
+                  width: `${(side / imgW * 100).toFixed(1)}%`,
+                  height: `${(side / imgH * 100).toFixed(1)}%`,
+                }}
+                title={`最小検出サイズ: ${Math.round(side)}×${Math.round(side)}px`}
+              />
+            );
+          })()}
+        </div>
+
+        <div className="telem-row">
+          <span className="telem-label">count</span>
+          <span className="telem-val">{detections?.detections.length ?? 0}</span>
+        </div>
+        <div className="telem-row">
+          <span className="telem-label">markers</span>
+          <span className="telem-val">{markers?.text ?? '--'}</span>
+        </div>
+      </div>
+
+    </div>
+  );
+}

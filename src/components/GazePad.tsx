@@ -3,6 +3,8 @@ import { useRef, useEffect, useCallback } from 'react';
 interface GazePadProps {
   /** 視線方向を通知する。x=画面右(+)、y=画面下(+)、各 -1..1 */
   onGaze: (x: number, y: number) => void;
+  /** true のとき操作を受け付けない（例: Vision が gaze を制御中）。 */
+  disabled?: boolean;
 }
 
 const SIZE = 200;
@@ -13,12 +15,14 @@ const DOT_R = 14;
  * 2D 視線パッド。アプリの目が Follow モードのとき、ここをドラッグすると
  * `/look_at` を送って視線方向を操作できる。中央=正面、四隅=その方向を見る。
  */
-export function GazePad({ onGaze }: GazePadProps) {
+export function GazePad({ onGaze, disabled = false }: GazePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dotRef = useRef({ x: 0, y: 0 }); // -1..1（x:右+, y:下+）
   const draggingRef = useRef(false);
   const onGazeRef = useRef(onGaze);
   onGazeRef.current = onGaze;
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -87,13 +91,14 @@ export function GazePad({ onGaze }: GazePadProps) {
     if (!canvas) return;
 
     const down = (e: PointerEvent) => {
+      if (disabledRef.current) return;
       e.preventDefault();
       draggingRef.current = true;
       canvas.setPointerCapture(e.pointerId);
       posToGaze(e.clientX, e.clientY);
     };
     const move = (e: PointerEvent) => {
-      if (!draggingRef.current) return;
+      if (disabledRef.current || !draggingRef.current) return;
       e.preventDefault();
       posToGaze(e.clientX, e.clientY);
     };
@@ -116,14 +121,18 @@ export function GazePad({ onGaze }: GazePadProps) {
   }, [draw]);
 
   return (
-    <div className="gaze-pad">
+    <div className="gaze-pad" style={disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
       <canvas
         ref={canvasRef}
         width={SIZE}
         height={SIZE}
-        style={{ width: SIZE, height: SIZE, cursor: 'crosshair', display: 'block', touchAction: 'none' }}
+        style={{
+          width: SIZE, height: SIZE,
+          cursor: disabled ? 'not-allowed' : 'crosshair',
+          display: 'block', touchAction: 'none',
+        }}
       />
-      <button className="gaze-center-btn" onClick={center}>Recenter</button>
+      <button className="gaze-center-btn" onClick={center} disabled={disabled}>Recenter</button>
     </div>
   );
 }

@@ -10,6 +10,16 @@ export function Face() {
 
   const recognized = useBrain(s => s.recognized);
   const clearRecognized = useBrain(s => s.clearRecognized);
+  const visionConfig = useBrain(s => s.visionConfig);
+
+  // Vision の gaze behavior が動いている間は同じ /look_at を奪い合うため、
+  // 手動 GazePad を無効化して競合を防ぐ（排他を UI で明示）。
+  const visionGazeActive = !!(
+    visionConfig &&
+    visionConfig.enabled &&
+    visionConfig.mode !== 'off' &&
+    visionConfig.behaviors.look_at
+  );
 
   // /look_at 送信のスロットリング（ドラッグ中の publish 過多を防ぐ）
   const lastLookAtRef = useRef(0);
@@ -74,10 +84,17 @@ export function Face() {
       {/* Gaze control (web → app, /look_at) */}
       <div className="card">
         <div className="card-title">Gaze control</div>
-        <div className="expr-hint" style={{ marginBottom: 8 }}>
-          Set the app's eyes to <b>Follow</b> mode to control the gaze direction with this pad.
-        </div>
-        <GazePad onGaze={(x, y) => sendLookAt(x, y)} />
+        {visionGazeActive ? (
+          <div className="expr-hint" style={{ marginBottom: 8 }}>
+            🟢 <b>Vision is controlling gaze</b> (/look_at). Disable “Gaze (/look_at)”
+            in the Vision tab to control the eyes manually here.
+          </div>
+        ) : (
+          <div className="expr-hint" style={{ marginBottom: 8 }}>
+            Set the app's eyes to <b>Follow</b> mode to control the gaze direction with this pad.
+          </div>
+        )}
+        <GazePad onGaze={(x, y) => sendLookAt(x, y)} disabled={visionGazeActive} />
       </div>
 
       {/* Expression */}
