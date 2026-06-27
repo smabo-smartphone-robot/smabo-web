@@ -150,7 +150,7 @@ export function Vision() {
               />
             </div>
             <div className="expr-hint">
-              印刷したマーカーの辞書を選んでください。分からない場合は <b>ALL</b> で全辞書を走査します（少し重く、誤検出が増えることがあります）。
+              Select the dictionary of the marker you printed. If unsure, use <b>ALL</b> to scan every dictionary (a bit heavier, and may increase false positives).
             </div>
           </>
         )}
@@ -179,13 +179,13 @@ export function Vision() {
           <input
             type="range"
             min={1} max={30} step={1}
-            value={cfg.capture_fps ?? 5}
+            value={cfg.capture_fps ?? 30}
             onChange={e => setVisionConfig({ capture_fps: Number(e.target.value) })}
           />
-          <span className="val">{cfg.capture_fps ?? 5} fps</span>
+          <span className="val">{cfg.capture_fps ?? 30} fps</span>
         </div>
         <div className="expr-hint" style={{ marginTop: -4, marginBottom: 8 }}>
-          ブラウザからブレインへ送るフレーム頻度。高いほど目線・首・走行の追従が滑らかになりますが、通信量と CPU 負荷が増えます。
+          Frame rate sent from the browser to the brain. Higher is smoother for gaze / servo / drive following, but uses more bandwidth and CPU.
         </div>
 
         <div className="config-field">
@@ -200,7 +200,7 @@ export function Vision() {
             {(() => {
               if (imgW > 0 && imgH > 0) {
                 const side = Math.round(Math.sqrt(cfg.min_area_frac * imgW * imgH));
-                return `短辺≥${side}px`;
+                return `min side ≥ ${side}px`;
               }
               return `${(cfg.min_area_frac * 100).toFixed(2)}%`;
             })()}
@@ -212,7 +212,7 @@ export function Vision() {
       <div className="card">
         <div className="card-title">Behaviors</div>
         <div className="expr-hint" style={{ marginBottom: 8 }}>
-          検出した方向を、目線・首サーボ・走行のどれに反映するか個別に選びます。
+          Choose individually whether the detected direction drives the gaze, the servo, and/or the drive.
         </div>
 
         <div className="config-field">
@@ -223,32 +223,35 @@ export function Vision() {
             onChange={e => setVisionConfig({ behaviors: { look_at: e.target.checked } })}
           />
         </div>
+
         <div className="config-field">
-          <label>Neck servo (/servo/command)</label>
+          <label>Servo follow (/servo/command)</label>
           <input
             type="checkbox"
             checked={cfg.behaviors.servo}
             onChange={e => setVisionConfig({ behaviors: { servo: e.target.checked } })}
           />
         </div>
-        <div className="config-field">
-          <label>Drive follow (/cmd_vel)</label>
-          <input
-            type="checkbox"
-            checked={cfg.behaviors.drive}
-            onChange={e => setVisionConfig({ behaviors: { drive: e.target.checked } })}
-          />
-        </div>
-
         {cfg.behaviors.servo && (
-          <>
+          <div className="behavior-settings">
             <div className="config-field">
-              <label>Pan joint</label>
+              <label>Pan joint (horizontal)</label>
               <input
                 type="text"
                 value={cfg.target_joints.pan}
                 onChange={e => setVisionConfig({ target_joints: { pan: e.target.value } })}
               />
+            </div>
+            <div className="config-field">
+              <label>Tilt joint (vertical)</label>
+              <input
+                type="text"
+                value={cfg.target_joints.tilt}
+                onChange={e => setVisionConfig({ target_joints: { tilt: e.target.value } })}
+              />
+            </div>
+            <div className="expr-hint" style={{ marginTop: -4, marginBottom: 8 }}>
+              Joint that follows left/right (pan) and the joint that follows up/down (tilt). Leave one blank to follow on that axis only.
             </div>
             <div className="config-field">
               <label>Servo gain</label>
@@ -259,11 +262,19 @@ export function Vision() {
                 onChange={e => setVisionConfig({ target_joints: { gain: Number(e.target.value) } })}
               />
             </div>
-          </>
+          </div>
         )}
 
+        <div className="config-field">
+          <label>Drive follow (/cmd_vel)</label>
+          <input
+            type="checkbox"
+            checked={cfg.behaviors.drive}
+            onChange={e => setVisionConfig({ behaviors: { drive: e.target.checked } })}
+          />
+        </div>
         {cfg.behaviors.drive && (
-          <>
+          <div className="behavior-settings">
             <div className="config-field">
               <label>Target size (frac)</label>
               <input
@@ -291,7 +302,7 @@ export function Vision() {
                 onChange={e => setVisionConfig({ drive: { max_ang: Number(e.target.value) } })}
               />
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -304,7 +315,7 @@ export function Vision() {
             disabled={!connected}
             onClick={() => setPreview(!previewOn)}
           >
-            {previewOn ? '■ プレビュー停止' : '▶ プレビュー'}
+            {previewOn ? '■ Stop preview' : '▶ Preview'}
           </button>
         </div>
         <div className="vision-frame">
@@ -314,7 +325,7 @@ export function Vision() {
             <div className="camera-placeholder">
               {!connected
                 ? 'Connect to brain to view camera'
-                : previewOn ? 'Connecting preview…' : 'プレビューはOFFです（検出は動作中）'}
+                : previewOn ? 'Connecting preview…' : 'Preview is OFF (detection still running)'}
             </div>
           )}
           {imgW > 0 && imgH > 0 && detections?.detections.map((d, i) => {
@@ -339,7 +350,7 @@ export function Vision() {
                   width: `${(side / imgW * 100).toFixed(1)}%`,
                   height: `${(side / imgH * 100).toFixed(1)}%`,
                 }}
-                title={`最小検出サイズ: ${Math.round(side)}×${Math.round(side)}px`}
+                title={`Min detection size: ${Math.round(side)}×${Math.round(side)}px`}
               />
             );
           })()}

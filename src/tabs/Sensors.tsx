@@ -133,7 +133,7 @@ export function Sensors() {
             disabled={status !== 'connected'}
             onClick={() => setPreview(!previewOn)}
           >
-            {previewOn ? '■ プレビュー停止' : '▶ プレビュー'}
+            {previewOn ? '■ Stop preview' : '▶ Preview'}
           </button>
           <div className={`live-dot ${webrtcStream ? 'live' : ''}`} />
         </div>
@@ -143,7 +143,7 @@ export function Sensors() {
           <div className="camera-placeholder">
             {status !== 'connected'
               ? 'No camera feed'
-              : previewOn ? 'Connecting preview…' : 'プレビューはOFFです'}
+              : previewOn ? 'Connecting preview…' : 'Preview is OFF'}
           </div>
         )}
       </div>

@@ -36,7 +36,7 @@ function Esp32CommCheck() {
 
       <div className="esp32-check-row">
         <span className={`live-dot ${restDot}`} />
-        <span className="esp32-check-label" title="web → ESP32 への HTTP 直結（GET /config）">
+        <span className="esp32-check-label" title="Direct HTTP from web → ESP32 (GET /config)">
           REST (web↔ESP32)
         </span>
         <span className="esp32-check-val">{restText}</span>
@@ -50,7 +50,7 @@ function Esp32CommCheck() {
       <div className="esp32-check-row">
         <span className={`live-dot ${wsPingDot}`} />
         <span className="esp32-check-label"
-          title="brain 経由で /ping→/pong をエコー。web↔brain 接続済み時のみ有効なので、結果は brain↔ESP32 の WS 疎通を示す">
+          title="Echoes /ping→/pong via the brain. Only works while web↔brain is connected, so the result indicates brain↔ESP32 WS connectivity.">
           WS (brain↔ESP32)
         </span>
         <span className="esp32-check-val">{wsPingText}</span>
