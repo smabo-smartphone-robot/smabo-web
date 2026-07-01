@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
 
-// ── ESP32 通信確認 ───────────────────────────────────────────
-// 2 経路を確認する:
-//   1. REST（web → ESP32 直通）: GET /config への ping
-//   2. WS テレメトリ（ESP32 → brain → web）: /odom・/joint_states の受信鮮度
+// ── ESP32 connectivity check ─────────────────────────────────
+// Verifies two paths:
+//   1. REST (web → ESP32 direct): GET /config ping
+//   2. WS telemetry (ESP32 → brain → web): freshness of /odom and /joint_states
 function Esp32CommCheck() {
   const esp32Host = useBrain(s => s.esp32Host);
   const esp32Ping = useBrain(s => s.esp32Ping);
@@ -70,52 +70,7 @@ function Esp32CommCheck() {
   );
 }
 
-// ── field components ─────────────────────────────────────────
-
-function BoolField({ label, value, onChange }: {
-  label: string; value: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="config-field">
-      <label>{label}</label>
-      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} />
-    </div>
-  );
-}
-
-function NumField({ label, value, onSend, isInt }: {
-  label: string; value: number; onSend: (v: number) => void; isInt?: boolean;
-}) {
-  const [local, setLocal] = useState(String(value ?? ''));
-  const send = () => {
-    const v = isInt ? parseInt(local, 10) : parseFloat(local);
-    if (!isNaN(v)) onSend(v);
-  };
-  return (
-    <div className="config-field">
-      <label>{label}</label>
-      <input type="number" value={local} step={isInt ? 1 : 'any'}
-        onChange={e => setLocal(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') send(); }} />
-      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={send}>Send</button>
-    </div>
-  );
-}
-
-function StrField({ label, value, onSend, isPassword }: {
-  label: string; value: string; onSend: (v: string) => void; isPassword?: boolean;
-}) {
-  const [local, setLocal] = useState(value ?? '');
-  return (
-    <div className="config-field">
-      <label>{label}</label>
-      <input type={isPassword ? 'password' : 'text'} value={local}
-        onChange={e => setLocal(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') onSend(local); }} />
-      <button style={{ padding: '3px 8px', fontSize: '.72rem' }} onClick={() => onSend(local)}>Send</button>
-    </div>
-  );
-}
+// ── field components (legacy — kept for Advanced staged inputs only) ─────
 
 // ── type helpers ─────────────────────────────────────────────
 
@@ -135,6 +90,245 @@ function s(v: unknown, def = ''): string {
   return typeof v === 'string' ? v : def;
 }
 
+// ── SectionHeader ────────────────────────────────────────────
+// Section heading that acts as a visual table-of-contents marker
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '.72rem', fontWeight: 700, color: 'var(--ink)',
+      borderLeft: '3px solid var(--accent)', paddingLeft: 8,
+      marginTop: 10, marginBottom: 6,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ── InlineStr ────────────────────────────────────────────────
+
+function InlineStr({ value, onChange, isPassword, w = 120 }: {
+  value: string; onChange: (v: string) => void; isPassword?: boolean; w?: number;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <input
+      type={isPassword ? 'password' : 'text'} value={local}
+      style={{ width: w, fontSize: '.72rem', padding: '1px 4px',
+               background: 'transparent', border: '1px solid var(--line)',
+               borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value) onChange(local); }}
+      onKeyDown={e => { if (e.key === 'Enter' && local !== value) onChange(local); }}
+    />
+  );
+}
+
+// ── InlineNum ────────────────────────────────────────────────
+// Number input that commits on blur or Enter — no Send button needed.
+
+function InlineNum({ value, onChange, isInt, w = 50 }: {
+  value: number; onChange: (v: number) => void; isInt?: boolean; w?: number;
+}) {
+  const [local, setLocal] = useState(String(value));
+  useEffect(() => { setLocal(String(value)); }, [value]);
+  const commit = () => {
+    const v = isInt ? parseInt(local, 10) : parseFloat(local);
+    if (!isNaN(v) && v !== value) onChange(v);
+  };
+  return (
+    <input
+      type="number" value={local} step={isInt ? 1 : 'any'}
+      style={{ width: w, fontSize: '.72rem', padding: '1px 4px', textAlign: 'right',
+               background: 'transparent', border: '1px solid var(--line)',
+               borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+    />
+  );
+}
+
+// ── ServoTable ────────────────────────────────────────────────
+// Inline-editable table: one row per servo, all fields always visible.
+
+function ServoTable({ joints, rgroups, sorted, patch, removeConfig, setServoEnabled, handleProps, dropProps }: {
+  joints: Record<string, unknown>;
+  rgroups: Record<string, unknown>[];
+  sorted: string[];
+  patch: (v: Record<string, unknown>) => void;
+  removeConfig: (v: Record<string, unknown>) => void;
+  setServoEnabled: (name: string, enabled: boolean) => void;
+  handleProps: (name: string) => Record<string, unknown>;
+  dropProps: (name: string, allNames: string[]) => Record<string, unknown>;
+}) {
+  const allNames = Object.keys(joints);
+
+  const behaviorFor = (groups: Record<string, unknown>[]) =>
+    groups.some(g => arr<string>(g['joints']).length > 0) ? 'random' : 'manual';
+
+  const setMode = (name: string, val: string) => {
+    const without: Record<string, unknown>[] = rgroups.map(g => ({ ...g, joints: arr<string>(g['joints']).filter(j => j !== name) }));
+    if (val === 'manual') {
+      patch({ servos: { behavior: behaviorFor(without), random_groups: without } });
+    } else {
+      const updated = without.map(g => s(g['name']) === val ? { ...g, joints: [...arr<string>(g['joints']), name] } : g);
+      patch({ servos: { behavior: 'random', random_groups: updated } });
+    }
+  };
+
+  // Grid columns: handle | enable | name | ch | min° | max° | init° | speed | min_us | max_us | inv | mode | ×
+  const cols = '18px 28px 1fr 38px 50px 50px 50px 54px 56px 60px 28px auto 22px';
+  const hdr: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
+                                      padding: '1px 1px 5px', whiteSpace: 'nowrap' };
+  const cell: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 1px' };
+  const selStyle: React.CSSProperties = { fontSize: '.72rem', padding: '1px 2px', background: 'transparent',
+                                           border: '1px solid var(--line)', borderRadius: 3, color: 'var(--ink)' };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: cols, columnGap: 4,
+                  alignItems: 'center', overflowX: 'auto', marginBottom: 4 }}>
+      {/* header */}
+      {(['','','name','ch','min°','max°','init°','speed','min µs','max µs','inv','mode',''] as const)
+        .map(h => <span key={h} style={hdr}>{h}</span>)}
+
+      {/* rows */}
+      {sorted.map(name => {
+        const jv = joints[name];
+        if (!jv) return null;
+        const j = rec(jv);
+        const enabled = j['enabled'] !== false;
+        const inGroup = rgroups.find(g => arr<string>(g['joints']).includes(name));
+        const jp = (f: string, v: unknown) => patch({ servos: { joints: { [name]: { [f]: v } } } });
+        return (
+          <div key={name} style={{ display: 'contents' }} {...dropProps(name, allNames)}>
+            <span style={{ ...cell, cursor: 'grab', color: 'var(--muted)' }}
+              {...handleProps(name)}>⠿</span>
+            <span style={cell}>
+              <input type="checkbox" checked={enabled}
+                onChange={() => setServoEnabled(name, !enabled)} />
+            </span>
+            <span style={{ ...cell, fontSize: '.76rem',
+                           color: enabled ? 'var(--ink)' : 'var(--muted)',
+                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {name}</span>
+            <span style={cell}><InlineNum value={n(j['channel'])}       isInt w={38} onChange={v => jp('channel',    v)} /></span>
+            <span style={cell}><InlineNum value={n(j['min_angle'], -90)}      w={50} onChange={v => jp('min_angle',  v)} /></span>
+            <span style={cell}><InlineNum value={n(j['max_angle'],  90)}      w={50} onChange={v => jp('max_angle',  v)} /></span>
+            <span style={cell}><InlineNum value={n(j['init_angle'])}          w={50} onChange={v => jp('init_angle', v)} /></span>
+            <span style={cell}><InlineNum value={n(j['max_speed'],  90)}      w={54} onChange={v => jp('max_speed',  v)} /></span>
+            <span style={cell}><InlineNum value={n(j['min_us'],    500)} isInt w={56} onChange={v => jp('min_us',    v)} /></span>
+            <span style={cell}><InlineNum value={n(j['max_us'],   2500)} isInt w={60} onChange={v => jp('max_us',    v)} /></span>
+            <span style={cell}>
+              <input type="checkbox" checked={b(j['invert'])}
+                onChange={e => jp('invert', e.target.checked)} />
+            </span>
+            <span style={cell}>
+              <select value={inGroup ? s(inGroup['name']) : 'manual'}
+                style={{ ...selStyle, color: inGroup ? 'var(--orange)' : 'var(--ink)' }}
+                onChange={e => setMode(name, e.target.value)}>
+                <option value="manual">manual</option>
+                {rgroups.map(g => <option key={s(g['name'])} value={s(g['name'])}>random ({s(g['name'])})</option>)}
+              </select>
+            </span>
+            <span style={cell}>
+              <button
+                style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
+                         background: 'transparent', border: '1px solid var(--line)',
+                         borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
+                onClick={() => { if (confirm(`Delete "${name}"?`)) removeConfig({ servos: { joints: { [name]: null } } }); }}>×</button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── RandomGroupSettings ──────────────────────────────────────
+
+function RandomGroupSettings({ rgroups, patch }: {
+  rgroups: Record<string, unknown>[];
+  patch: (v: Record<string, unknown>) => void;
+}) {
+  if (rgroups.length === 0) return null;
+
+  const behaviorFor = (groups: Record<string, unknown>[]) =>
+    groups.some(g => arr<string>(g['joints']).length > 0) ? 'random' : 'manual';
+
+  const updGroup = (name: string, fields: Record<string, unknown>) => {
+    const updated = rgroups.map(g =>
+      s(g['name']) === name ? { ...g, ...fields } : g
+    );
+    patch({ servos: { behavior: 'random', random_groups: updated } });
+  };
+
+  const deleteGroup = (name: string) => {
+    if (!confirm(`Delete group "${name}"?`)) return;
+    const updated = rgroups.filter(g => s(g['name']) !== name);
+    patch({ servos: { behavior: behaviorFor(updated), random_groups: updated } });
+  };
+
+  // columns: name | joints | iv min | iv max | saccade | drift | center_pull | drift_spd | long_pause | ×
+  const cols = '1fr auto 44px 44px 54px 50px 58px 58px 58px 22px';
+  const hdr: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
+                                      padding: '1px 1px 5px', whiteSpace: 'nowrap' };
+  const cell: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 1px' };
+
+  return (
+    <>
+      <SectionHeader>Random groups</SectionHeader>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, columnGap: 4,
+                    alignItems: 'center', overflowX: 'auto', marginBottom: 4 }}>
+        {/* header */}
+        {(['name','joints','iv min','iv max','saccade','drift','center_pull','drift_spd','long_pause',''] as const)
+          .map(h => <span key={h} style={hdr}>{h}</span>)}
+
+        {/* rows */}
+        {rgroups.map(g => {
+          const gn  = s(g['name']);
+          const iv  = arr<number>(g['interval']);
+          const jts = arr<string>(g['joints']);
+          return (
+            <React.Fragment key={gn}>
+              <span style={{ ...cell, fontSize: '.76rem', color: 'var(--orange)',
+                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gn}</span>
+              <span style={{ ...cell, fontSize: '.68rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                {jts.length > 0 ? jts.join(', ') : '—'}
+              </span>
+              <span style={cell}><InlineNum value={n(iv[0], 1)} w={44} onChange={v => updGroup(gn, { interval: [v, n(iv[1], 3)] })} /></span>
+              <span style={cell}><InlineNum value={n(iv[1], 3)} w={44} onChange={v => updGroup(gn, { interval: [n(iv[0], 1), v] })} /></span>
+              <span style={cell}><InlineNum value={n(g['saccade_prob'],   0.18)} w={54} onChange={v => updGroup(gn, { saccade_prob: v })} /></span>
+              <span style={cell}><InlineNum value={n(g['drift'],          0.07)} w={50} onChange={v => updGroup(gn, { drift: v })} /></span>
+              <span style={cell}><InlineNum value={n(g['center_pull'],    0.12)} w={58} onChange={v => updGroup(gn, { center_pull: v })} /></span>
+              <span style={cell}><InlineNum value={n(g['drift_speed'],    0.40)} w={58} onChange={v => updGroup(gn, { drift_speed: v })} /></span>
+              <span style={cell}><InlineNum value={n(g['long_pause_prob'],0.22)} w={58} onChange={v => updGroup(gn, { long_pause_prob: v })} /></span>
+              <span style={cell}>
+                <button
+                  style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
+                           background: 'transparent', border: '1px solid var(--line)',
+                           borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
+                  onClick={() => deleteGroup(gn)}>×</button>
+              </span>
+            </React.Fragment>
+          );
+        })}
+      </div>
+      <button style={{ fontSize: '.75rem', marginTop: 4 }} onClick={() => {
+        const gname = prompt('Group name:')?.trim();
+        if (!gname) return;
+        if (rgroups.some(g => s(g['name']) === gname)) {
+          alert(`Group "${gname}" already exists.`);
+          return;
+        }
+        const updated = [...rgroups, { name: gname, joints: [], interval: [1, 3] }];
+        patch({ servos: { behavior: behaviorFor(updated), random_groups: updated } });
+      }}>+ Add Random group</button>
+    </>
+  );
+}
+
 // ── main ─────────────────────────────────────────────────────
 
 export function Config() {
@@ -142,8 +336,12 @@ export function Config() {
   const patchConfig = useBrain(st => st.patchConfig);
   const removeConfig = useBrain(st => st.removeConfig);
   const setMode = useBrain(st => st.setMode);
+  const setServoEnabled = useBrain(st => st.setServoEnabled);
   const refreshConfig = useBrain(st => st.refreshConfig);
-  const { sort: sortServos, handleProps: servoHandle, dropProps: servoDrop } = useDragOrder('smabo-config-servos-order');
+  const { sort: sortServos, handleProps: servoHandle, dropProps: servoDrop, order: savedServoOrder } = useDragOrder(
+    'smabo-config-servos-order',
+    (newOrder) => patchConfig({ servos: { joint_order: newOrder } }),
+  );
 
   // staged holds a nested patch for the Advanced section
   const [staged, setStaged] = useState<Record<string, unknown>>({});
@@ -167,6 +365,7 @@ export function Config() {
   const modes      = rec(cfg['modes']);
   const svCfg      = rec(cfg['servos']);
   const joints     = rec(svCfg['joints']);
+  const jointOrder = arr<string>(svCfg['joint_order']);
   const rgroups    = arr<Record<string, unknown>>(svCfg['random_groups']);
   const dc         = rec(cfg['dc']);
   const dcPins     = rec(dc['pins']);
@@ -187,6 +386,29 @@ export function Config() {
   type MergeSetFn = (prev: Record<string, unknown>) => Record<string, unknown>;
   const stage = (fn: MergeSetFn) => setStaged(fn);
 
+  // Shared layout helpers
+  const lbl: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
+  const fg2: React.CSSProperties = {
+    display: 'grid', gridTemplateColumns: 'max-content auto',
+    columnGap: 10, rowGap: 4, alignItems: 'center', marginBottom: 8,
+  };
+  const zero: React.CSSProperties = {
+    fontSize: '.72rem', color: 'var(--line)', textAlign: 'center',
+    padding: '1px 4px', border: '1px solid var(--line)', borderRadius: 3,
+    minWidth: 32,
+  };
+  const stageInput = (w: number, val: number | string, type: 'number' | 'text' | 'password', onChg: (e: React.ChangeEvent<HTMLInputElement>) => void) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <input type={type} defaultValue={val} step={type === 'number' ? 1 : undefined}
+        style={{ width: w, fontSize: '.72rem', padding: '1px 4px',
+                 textAlign: type === 'number' ? 'right' : 'left',
+                 background: 'transparent', border: '1px solid var(--line)',
+                 borderRadius: 3, color: 'var(--ink)' }}
+        onChange={onChg} />
+      <span className="stage-badge">staged</span>
+    </span>
+  );
+
   return (
     <div className="config-layout">
 
@@ -196,282 +418,228 @@ export function Config() {
         <button onClick={refreshConfig}>Get config</button>
       </div>
 
-      {/* Modes */}
+      {/* ── Modes ───────────────────────────────────── */}
       <details open>
         <summary>Modes</summary>
         <div className="config-section">
-          {(['servos', 'dc_drive', 'encoder_drive', 'lidar'] as const).map(k => (
-            <BoolField key={k} label={k} value={b(modes[k])}
-              onChange={v => sendMode({ ...modes, [k]: v })} />
-          ))}
-        </div>
-      </details>
 
-      {/* Servos – per joint */}
-      <details>
-        <summary>Servos</summary>
-        <div className="config-section">
-          <BoolField label="random motion"
-            value={s(svCfg['behavior']) === 'random'}
-            onChange={v => patch({ servos: { behavior: v ? 'random' : 'manual' } })} />
-          <NumField label="joint_states_rate (Hz)"
-            value={n(svCfg['joint_states_rate'], 10)}
-            onSend={v => patch({ servos: { joint_states_rate: v } })} />
-
-          {sortServos(Object.keys(joints)).map(name => {
-            const jv = joints[name];
-            const j = rec(jv);
-            const jp = (f: string, v: unknown) => patch({ servos: { joints: { [name]: { [f]: v } } } });
-            const allNames = Object.keys(joints);
-            return (
-              <details key={name} style={{ border: '1px solid var(--border)', borderRadius: 4, marginTop: 4 }} {...servoDrop(name, allNames)}>
-                <summary style={{ fontSize: '.78rem', padding: '5px 8px' }}>
-                  <span className="drag-handle" {...servoHandle(name)}>⠿</span>
-                  {name}
-                </summary>
-                <div className="config-section">
-                  <NumField label="channel"        value={n(j['channel'])}           isInt onSend={v => jp('channel', v)} />
-                  <NumField label="min_angle (°)"  value={n(j['min_angle'], -90)}          onSend={v => jp('min_angle', v)} />
-                  <NumField label="max_angle (°)"  value={n(j['max_angle'],  90)}          onSend={v => jp('max_angle', v)} />
-                  <NumField label="init_angle (°)" value={n(j['init_angle'])}               onSend={v => jp('init_angle', v)} />
-                  <NumField label="max_speed (°/s)" value={n(j['max_speed'], 90)}           onSend={v => jp('max_speed', v)} />
-                  <NumField label="min_us"         value={n(j['min_us'], 500)}         isInt onSend={v => jp('min_us', v)} />
-                  <NumField label="max_us"         value={n(j['max_us'], 2500)}        isInt onSend={v => jp('max_us', v)} />
-                  <button
-                    style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent', fontSize: '.72rem', marginTop: 4 }}
-                    onClick={() => {
-                      if (!confirm(`Delete "${name}"?`)) return;
-                      removeConfig({ servos: { joints: { [name]: null } } });
-                    }}
-                  >Delete</button>
-                </div>
-              </details>
-            );
-          })}
-
-          <button style={{ fontSize: '.75rem', marginTop: 6 }} onClick={() => {
-            const name = prompt('Joint name:');
-            if (!name) return;
-            patch({ servos: { joints: { [name]: { channel: 0, min_angle: -90, max_angle: 90, init_angle: 0, max_speed: 90, min_us: 500, max_us: 2500 } } } });
-          }}>+ Add servo</button>
-        </div>
-      </details>
-
-      {/* Servos – motion assignment */}
-      <details>
-        <summary>Servos – Motion</summary>
-        <div className="config-section">
-          {Object.keys(joints).map(name => {
-            const inGroup = rgroups.find(g => arr<string>(g['joints']).includes(name));
-            const cur = inGroup ? s(inGroup['name']) : 'manual';
-            return (
-              <div key={name} className="config-field">
-                <label>{name}</label>
-                <select value={cur} onChange={e => {
-                  const next = e.target.value;
-                  const updated = rgroups.map(g => {
-                    const js = arr<string>(g['joints']).filter(j => j !== name);
-                    if (s(g['name']) === next) js.push(name);
-                    return { ...g, joints: js };
-                  });
-                  patch({ servos: { random_groups: updated } });
-                }}>
-                  <option value="manual">manual</option>
-                  {rgroups.map(g => {
-                    const gn = s(g['name']);
-                    return <option key={gn} value={gn}>{gn}</option>;
-                  })}
-                </select>
+          {/* servos */}
+          <details>
+            <summary>
+              <span style={{ flex: 1 }}>servos</span>
+              <input type="checkbox" checked={b(modes['servos'])}
+                onClick={e => e.stopPropagation()}
+                onChange={e => sendMode({ ...modes, servos: e.target.checked })} />
+            </summary>
+            <div className="config-section">
+              <SectionHeader>General settings</SectionHeader>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.72rem', marginBottom: 6 }}>
+                <span style={lbl}>joint_states_rate</span>
+                <InlineNum value={n(svCfg['joint_states_rate'], 10)} isInt w={50}
+                  onChange={v => patch({ servos: { joint_states_rate: v } })} />
+                <span style={{ color: 'var(--dim)' }}>Hz</span>
               </div>
-            );
-          })}
-        </div>
-      </details>
+              <SectionHeader>Servo settings</SectionHeader>
+              <ServoTable
+                joints={joints}
+                rgroups={rgroups}
+                sorted={(() => {
+                  const names = Object.keys(joints);
+                  if (savedServoOrder.length === 0 && jointOrder.length > 0) {
+                    return [...jointOrder.filter(n => names.includes(n)), ...names.filter(n => !jointOrder.includes(n))];
+                  }
+                  return sortServos(names);
+                })()}
+                patch={patch}
+                removeConfig={removeConfig}
+                setServoEnabled={setServoEnabled}
+                handleProps={servoHandle}
+                dropProps={servoDrop}
+              />
+              <button style={{ fontSize: '.75rem', marginTop: 4, marginBottom: 6 }} onClick={() => {
+                const name = prompt('Joint name:');
+                if (!name) return;
+                patch({ servos: { joints: { [name]: { channel: 0, min_angle: -90, max_angle: 90, init_angle: 0, max_speed: 90, min_us: 500, max_us: 2500, enabled: false } } } });
+              }}>+ Add servo</button>
+              <RandomGroupSettings rgroups={rgroups} patch={patch} />
+            </div>
+          </details>
 
-      {/* Servos – random groups */}
-      <details>
-        <summary>Servos – Random groups</summary>
-        <div className="config-section">
-          {rgroups.map((g, i) => {
-            const gn = s(g['name'], `group${i}`);
-            const iv = arr<number>(g['interval']);
-            const updG = (key: string, v: unknown) =>
-              patch({ servos: { random_groups: rgroups.map(gg => s(gg['name']) === gn ? { ...gg, [key]: v } : gg) } });
-            return (
-              <div key={gn} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: '.78rem', color: 'var(--orange)', marginBottom: 4 }}>
-                  {gn} [{arr<string>(g['joints']).join(', ')}]
-                </div>
-                <NumField label="interval min (s)" value={iv[0] ?? 1}
-                  onSend={v => updG('interval', [v, iv[1] ?? 3])} />
-                <NumField label="interval max (s)" value={iv[1] ?? 3}
-                  onSend={v => updG('interval', [iv[0] ?? 1, v])} />
-                <button
-                  style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent', fontSize: '.72rem', marginTop: 4 }}
-                  onClick={() => patch({ servos: { random_groups: rgroups.filter(gg => s(gg['name']) !== gn) } })}
-                >Delete group</button>
+          {/* dc_drive */}
+          <details>
+            <summary>
+              <span style={{ flex: 1 }}>dc_drive</span>
+              <input type="checkbox" checked={b(modes['dc_drive'])}
+                onClick={e => e.stopPropagation()}
+                onChange={e => sendMode({ ...modes, dc_drive: e.target.checked })} />
+            </summary>
+            <div className="config-section">
+              <div style={fg2}>
+                <span style={lbl}>max_linear (m/s)</span>
+                <InlineNum value={n(dc['max_linear'], 0.3)} w={60} onChange={v => patch({ dc: { max_linear: v } })} />
+                <span style={lbl}>max_angular (rad/s)</span>
+                <InlineNum value={n(dc['max_angular'], 1.5)} w={60} onChange={v => patch({ dc: { max_angular: v } })} />
+                <span style={lbl}>wheel_radius (m)</span>
+                <InlineNum value={n(dc['wheel_radius'], 0.03)} w={60} onChange={v => patch({ dc: { wheel_radius: v } })} />
+                <span style={lbl}>wheel_separation (m)</span>
+                <InlineNum value={n(dc['wheel_separation'], 0.15)} w={60} onChange={v => patch({ dc: { wheel_separation: v } })} />
+                <span style={lbl}>pwm_freq (Hz)</span>
+                <InlineNum value={n(dc['pwm_freq'], 1000)} isInt w={60} onChange={v => patch({ dc: { pwm_freq: v } })} />
+                <span style={lbl}>cmd_timeout (s)</span>
+                <InlineNum value={n(dc['cmd_timeout'], 0.5)} w={60} onChange={v => patch({ dc: { cmd_timeout: v } })} />
+                <span style={lbl}>invert_left</span>
+                <input type="checkbox" checked={b(dc['invert_left'])} onChange={e => patch({ dc: { invert_left: e.target.checked } })} />
+                <span style={lbl}>invert_right</span>
+                <input type="checkbox" checked={b(dc['invert_right'])} onChange={e => patch({ dc: { invert_right: e.target.checked } })} />
               </div>
-            );
-          })}
-          <button style={{ fontSize: '.75rem' }} onClick={() => {
-            const name = prompt('Group name:');
-            if (!name) return;
-            patch({ servos: { random_groups: [...rgroups, { name, joints: [], interval: [1, 3] }] } });
-          }}>+ Add group</button>
+            </div>
+          </details>
+
+          {/* encoder_drive */}
+          <details>
+            <summary>
+              <span style={{ flex: 1 }}>encoder_drive</span>
+              <input type="checkbox" checked={b(modes['encoder_drive'])}
+                onClick={e => e.stopPropagation()}
+                onChange={e => sendMode({ ...modes, encoder_drive: e.target.checked })} />
+            </summary>
+            <div className="config-section">
+              <div style={fg2}>
+                <span style={lbl}>cpr (counts/rev)</span>
+                <InlineNum value={n(enc['cpr'], 1320)} isInt w={60} onChange={v => patch({ encoder: { cpr: v } })} />
+                <span style={lbl}>publish_rate (Hz)</span>
+                <InlineNum value={n(enc['publish_rate'], 20)} w={60} onChange={v => patch({ encoder: { publish_rate: v } })} />
+                <span style={lbl}>odom_frame</span>
+                <InlineStr value={s(enc['odom_frame'], 'odom')} w={110} onChange={v => patch({ encoder: { odom_frame: v } })} />
+                <span style={lbl}>base_frame</span>
+                <InlineStr value={s(enc['base_frame'], 'base_footprint')} w={110} onChange={v => patch({ encoder: { base_frame: v } })} />
+              </div>
+              <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 4 }}>covariance (applied on smabo-brain side)</div>
+              <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 2 }}>pose (x, y, θ)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: 3, marginBottom: 8, width: 'fit-content' }}>
+                <InlineNum value={n(encCov['pose_xx'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { pose_xx: v } } })} />
+                <span style={zero}>0</span><span style={zero}>0</span>
+                <span style={zero}>0</span>
+                <InlineNum value={n(encCov['pose_yy'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { pose_yy: v } } })} />
+                <span style={zero}>0</span>
+                <span style={zero}>0</span><span style={zero}>0</span>
+                <InlineNum value={n(encCov['pose_aa'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { pose_aa: v } } })} />
+              </div>
+              <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 2 }}>twist (v, ω)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: 3, marginBottom: 8, width: 'fit-content' }}>
+                <InlineNum value={n(encCov['twist_vv'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { twist_vv: v } } })} />
+                <span style={zero}>0</span>
+                <span style={zero}>0</span>
+                <InlineNum value={n(encCov['twist_ww'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { twist_ww: v } } })} />
+              </div>
+            </div>
+          </details>
+
+          {/* lidar */}
+          <details>
+            <summary>
+              <span style={{ flex: 1 }}>lidar</span>
+              <input type="checkbox" checked={b(modes['lidar'])}
+                onClick={e => e.stopPropagation()}
+                onChange={e => sendMode({ ...modes, lidar: e.target.checked })} />
+            </summary>
+            <div className="config-section">
+              <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 4 }}>
+                LD06 → /scan (Nav2). UART pin changes hot-reload (no reboot).
+              </div>
+              <div style={fg2}>
+                <span style={lbl}>uart</span>
+                <InlineNum value={n(lidar['uart'], 1)} isInt w={48} onChange={v => patch({ lidar: { uart: v } })} />
+                <span style={lbl}>rx pin</span>
+                <InlineNum value={n(lidar['rx'], 20)} isInt w={48} onChange={v => patch({ lidar: { rx: v } })} />
+                <span style={lbl}>tx pin (−1=off)</span>
+                <InlineNum value={n(lidar['tx'], -1)} isInt w={48} onChange={v => patch({ lidar: { tx: v } })} />
+                <span style={lbl}>baud</span>
+                <InlineNum value={n(lidar['baud'], 230400)} isInt w={72} onChange={v => patch({ lidar: { baud: v } })} />
+                <span style={lbl}>frame_id</span>
+                <InlineStr value={s(lidar['frame_id'], 'laser')} w={90} onChange={v => patch({ lidar: { frame_id: v } })} />
+                <span style={lbl}>bins</span>
+                <InlineNum value={n(lidar['bins'], 360)} isInt w={56} onChange={v => patch({ lidar: { bins: v } })} />
+                <span style={lbl}>range_min (m)</span>
+                <InlineNum value={n(lidar['range_min'], 0.05)} w={60} onChange={v => patch({ lidar: { range_min: v } })} />
+                <span style={lbl}>range_max (m)</span>
+                <InlineNum value={n(lidar['range_max'], 12.0)} w={60} onChange={v => patch({ lidar: { range_max: v } })} />
+              </div>
+            </div>
+          </details>
+
         </div>
       </details>
 
-      {/* Drive (DC) */}
-      <details>
-        <summary>Drive (DC)</summary>
-        <div className="config-section">
-          <NumField label="max_linear (m/s)"      value={n(dc['max_linear'], 0.3)}    onSend={v => patch({ dc: { max_linear: v } })} />
-          <NumField label="max_angular (rad/s)"   value={n(dc['max_angular'], 1.5)}   onSend={v => patch({ dc: { max_angular: v } })} />
-          <NumField label="wheel_radius (m)"      value={n(dc['wheel_radius'], 0.03)} onSend={v => patch({ dc: { wheel_radius: v } })} />
-          <NumField label="wheel_separation (m)"  value={n(dc['wheel_separation'], 0.15)} onSend={v => patch({ dc: { wheel_separation: v } })} />
-          <NumField label="pwm_freq (Hz)"         value={n(dc['pwm_freq'], 1000)}     isInt onSend={v => patch({ dc: { pwm_freq: v } })} />
-          <NumField label="cmd_timeout (s)"       value={n(dc['cmd_timeout'], 0.5)}   onSend={v => patch({ dc: { cmd_timeout: v } })} />
-          <BoolField label="invert_left"  value={b(dc['invert_left'])}  onChange={v => patch({ dc: { invert_left: v } })} />
-          <BoolField label="invert_right" value={b(dc['invert_right'])} onChange={v => patch({ dc: { invert_right: v } })} />
-        </div>
-      </details>
-
-      {/* Encoder / Odometry */}
-      <details>
-        <summary>Encoder / Odometry</summary>
-        <div className="config-section">
-          <NumField label="cpr (counts/rev)"  value={n(enc['cpr'], 1320)}  isInt onSend={v => patch({ encoder: { cpr: v } })} />
-          <NumField label="publish_rate (Hz)" value={n(enc['publish_rate'], 20)} onSend={v => patch({ encoder: { publish_rate: v } })} />
-          <StrField label="odom_frame" value={s(enc['odom_frame'], 'odom')}
-            onSend={v => patch({ encoder: { odom_frame: v } })} />
-          <StrField label="base_frame" value={s(enc['base_frame'], 'base_footprint')}
-            onSend={v => patch({ encoder: { base_frame: v } })} />
-          <div style={{ fontSize: '.75rem', color: 'var(--dim)', margin: '6px 0 2px' }}>covariance (applied on smabo-brain side)</div>
-          {(['pose_xx','pose_yy','pose_aa','twist_vv','twist_ww'] as const).map(f => (
-            <NumField key={f} label={f} value={n(encCov[f], 0.001)}
-              onSend={v => patch({ encoder: { covariance: { [f]: v } } })} />
-          ))}
-        </div>
-      </details>
-
-      {/* Lidar (LD06) */}
-      <details>
-        <summary>Lidar (LD06)</summary>
-        <div className="config-section">
-          <BoolField label="lidar enabled (modes.lidar)" value={b(modes['lidar'])}
-            onChange={v => sendMode({ ...modes, lidar: v })} />
-          <div style={{ fontSize: '.75rem', color: 'var(--dim)', margin: '2px 0 6px' }}>
-            LD06 → /scan (Nav2 sensor). UART pin changes hot-reload (no reboot).
-          </div>
-          <NumField label="uart"           value={n(lidar['uart'], 1)}        isInt onSend={v => patch({ lidar: { uart: v } })} />
-          <NumField label="rx pin"         value={n(lidar['rx'], 20)}         isInt onSend={v => patch({ lidar: { rx: v } })} />
-          <NumField label="tx pin (-1=off)" value={n(lidar['tx'], -1)}        isInt onSend={v => patch({ lidar: { tx: v } })} />
-          <NumField label="baud"           value={n(lidar['baud'], 230400)}   isInt onSend={v => patch({ lidar: { baud: v } })} />
-          <StrField label="frame_id"       value={s(lidar['frame_id'], 'laser')}    onSend={v => patch({ lidar: { frame_id: v } })} />
-          <NumField label="bins"           value={n(lidar['bins'], 360)}      isInt onSend={v => patch({ lidar: { bins: v } })} />
-          <NumField label="range_min (m)"  value={n(lidar['range_min'], 0.05)}      onSend={v => patch({ lidar: { range_min: v } })} />
-          <NumField label="range_max (m)"  value={n(lidar['range_max'], 12.0)}      onSend={v => patch({ lidar: { range_max: v } })} />
-        </div>
-      </details>
-
-      {/* Advanced */}
+      {/* ── Advanced ─────────────────────────────────── */}
       <details>
         <summary>Advanced – pins / bus / WiFi ⚠️ reboot</summary>
         <div className="config-section">
-          <div style={{ color: 'var(--orange)', fontSize: '.75rem', marginBottom: 8 }}>
+          <div style={{ color: 'var(--orange)', fontSize: '.72rem', marginBottom: 6 }}>
             Changes are batched via Stage → Apply (ESP32 reboots). WiFi changes may drop the connection.
           </div>
-          {stagedCount > 0 && (
-            <div className="staged-notice">{stagedCount} field(s) staged</div>
-          )}
+          {stagedCount > 0 && <div className="staged-notice" style={{ marginBottom: 6 }}>{stagedCount} field(s) staged</div>}
 
-          <div className="config-sub">I2C</div>
-          {(['sda','scl'] as const).map(f => (
-            <div key={f} className="config-field">
-              <label>i2c.{f}</label>
-              <input type="number" defaultValue={n(i2c[f])} step={1}
-                onChange={e => stage(p => ({ ...p, i2c: { ...rec(p['i2c']), [f]: parseInt(e.target.value, 10) } }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
-          <div className="config-field">
-            <label>i2c.freq</label>
-            <input type="number" defaultValue={n(i2c['freq'], 400000)} step={1}
-              onChange={e => stage(p => ({ ...p, i2c: { ...rec(p['i2c']), freq: parseInt(e.target.value, 10) } }))} />
-            <span className="stage-badge">staged</span>
+          <SectionHeader>I2C</SectionHeader>
+          <div style={fg2}>
+            {(['sda','scl'] as const).flatMap(f => [
+              <span key={`l${f}`} style={lbl}>i2c.{f}</span>,
+              stageInput(56, n(i2c[f]), 'number', e => stage(p => ({ ...p, i2c: { ...rec(p['i2c']), [f]: parseInt(e.target.value, 10) } }))),
+            ])}
+            <span style={lbl}>i2c.freq</span>
+            {stageInput(72, n(i2c['freq'], 400000), 'number', e => stage(p => ({ ...p, i2c: { ...rec(p['i2c']), freq: parseInt(e.target.value, 10) } })))}
           </div>
 
-          <div className="config-sub">PCA9685</div>
-          {(['address','freq'] as const).map(f => (
-            <div key={f} className="config-field">
-              <label>pca9685.{f}</label>
-              <input type="number" defaultValue={n(pca[f])} step={1}
-                onChange={e => stage(p => ({ ...p, pca9685: { ...rec(p['pca9685']), [f]: parseInt(e.target.value, 10) } }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
-
-          <div className="config-sub">DC motor pins</div>
-          {(['stby','ain1','ain2','pwma','bin1','bin2','pwmb'] as const).map(f => (
-            <div key={f} className="config-field">
-              <label>dc.pins.{f}</label>
-              <input type="number" defaultValue={n(dcPins[f])} step={1}
-                onChange={e => stage(p => ({
-                  ...p, dc: { ...rec(p['dc']), pins: { ...rec(rec(p['dc'])['pins']), [f]: parseInt(e.target.value, 10) } }
-                }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
-
-          <div className="config-sub">Encoder pins</div>
-          {(['a','b'] as const).map(f => (
-            <div key={`L${f}`} className="config-field">
-              <label>encoder.left.{f}</label>
-              <input type="number" defaultValue={n(encLeft[f])} step={1}
-                onChange={e => stage(p => ({
-                  ...p, encoder: { ...rec(p['encoder']),
-                    left: { ...rec(rec(p['encoder'])['left']), [f]: parseInt(e.target.value, 10) } }
-                }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
-          {(['a','b'] as const).map(f => (
-            <div key={`R${f}`} className="config-field">
-              <label>encoder.right.{f}</label>
-              <input type="number" defaultValue={n(encRight[f])} step={1}
-                onChange={e => stage(p => ({
-                  ...p, encoder: { ...rec(p['encoder']),
-                    right: { ...rec(rec(p['encoder'])['right']), [f]: parseInt(e.target.value, 10) } }
-                }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
-
-          <div className="config-sub">Brain</div>
-          <div className="config-field">
-            <label>brain.host</label>
-            <input type="text" defaultValue={s(brainCfg['host'])}
-              onChange={e => stage(p => ({ ...p, brain: { ...rec(p['brain']), host: e.target.value } }))} />
-            <span className="stage-badge">staged</span>
-          </div>
-          <div className="config-field">
-            <label>brain.port</label>
-            <input type="number" defaultValue={n(brainCfg['port'], 9090)} step={1}
-              onChange={e => stage(p => ({ ...p, brain: { ...rec(p['brain']), port: parseInt(e.target.value, 10) } }))} />
-            <span className="stage-badge">staged</span>
+          <SectionHeader>PCA9685</SectionHeader>
+          <div style={fg2}>
+            {(['address','freq'] as const).flatMap(f => [
+              <span key={`l${f}`} style={lbl}>pca9685.{f}</span>,
+              stageInput(64, n(pca[f]), 'number', e => stage(p => ({ ...p, pca9685: { ...rec(p['pca9685']), [f]: parseInt(e.target.value, 10) } }))),
+            ])}
           </div>
 
-          <div className="config-sub">WiFi ⚠️</div>
-          {(['ssid','password','hostname'] as const).map(f => (
-            <div key={f} className="config-field">
-              <label>wifi.{f}</label>
-              <input type={f === 'password' ? 'password' : 'text'} defaultValue={s(wifi[f])}
-                onChange={e => stage(p => ({ ...p, wifi: { ...rec(p['wifi']), [f]: e.target.value } }))} />
-              <span className="stage-badge">staged</span>
-            </div>
-          ))}
+          <SectionHeader>DC motor pins</SectionHeader>
+          <div style={fg2}>
+            {(['stby','ain1','ain2','pwma','bin1','bin2','pwmb'] as const).flatMap(f => [
+              <span key={`l${f}`} style={lbl}>dc.pins.{f}</span>,
+              stageInput(52, n(dcPins[f]), 'number', e => stage(p => ({
+                ...p, dc: { ...rec(p['dc']), pins: { ...rec(rec(p['dc'])['pins']), [f]: parseInt(e.target.value, 10) } }
+              }))),
+            ])}
+          </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <SectionHeader>Encoder pins</SectionHeader>
+          <div style={fg2}>
+            {(['a','b'] as const).flatMap(f => [
+              <span key={`lL${f}`} style={lbl}>encoder.left.{f}</span>,
+              stageInput(52, n(encLeft[f]), 'number', e => stage(p => ({
+                ...p, encoder: { ...rec(p['encoder']), left: { ...rec(rec(p['encoder'])['left']), [f]: parseInt(e.target.value, 10) } }
+              }))),
+              <span key={`lR${f}`} style={lbl}>encoder.right.{f}</span>,
+              stageInput(52, n(encRight[f]), 'number', e => stage(p => ({
+                ...p, encoder: { ...rec(p['encoder']), right: { ...rec(rec(p['encoder'])['right']), [f]: parseInt(e.target.value, 10) } }
+              }))),
+            ])}
+          </div>
+
+          <SectionHeader>Brain</SectionHeader>
+          <div style={fg2}>
+            <span style={lbl}>brain.host</span>
+            {stageInput(120, s(brainCfg['host']), 'text', e => stage(p => ({ ...p, brain: { ...rec(p['brain']), host: e.target.value } })))}
+            <span style={lbl}>brain.port</span>
+            {stageInput(64, n(brainCfg['port'], 9090), 'number', e => stage(p => ({ ...p, brain: { ...rec(p['brain']), port: parseInt(e.target.value, 10) } })))}
+          </div>
+
+          <SectionHeader>WiFi ⚠️</SectionHeader>
+          <div style={fg2}>
+            {(['ssid','password','hostname'] as const).flatMap(f => [
+              <span key={`l${f}`} style={lbl}>wifi.{f}</span>,
+              stageInput(120, s(wifi[f]), f === 'password' ? 'password' : 'text',
+                e => stage(p => ({ ...p, wifi: { ...rec(p['wifi']), [f]: e.target.value } }))),
+            ])}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button
               style={{ background: 'var(--orange)', color: '#000' }}
               disabled={stagedCount === 0}
@@ -486,7 +654,7 @@ export function Config() {
         </div>
       </details>
 
-      {/* Full config JSON */}
+      {/* ── Full config JSON ─────────────────────────── */}
       <details>
         <summary>Full config (JSON)</summary>
         <div className="config-section">

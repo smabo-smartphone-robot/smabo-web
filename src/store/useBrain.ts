@@ -73,6 +73,10 @@ interface BrainStore {
   // Config
   esp32Config: Record<string, unknown> | null;
 
+  // ESP32 ↔ brain 接続状態（notice で追跡）
+  // null = 未確認（brain 接続直後など）、true/false = 確認済み
+  esp32Connected: boolean | null;
+
   // ESP32 通信確認
   esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果（web↔ESP32）
   esp32WsPing: { ok: boolean; latencyMs: number; at: number } | null; // WS /ping→/pong エコーの往復結果（brain↔ESP32）
@@ -86,6 +90,7 @@ interface BrainStore {
   // Actions
   setHost(h: string): void;
   connect(): void;
+  autoConnect(): void;
   setEsp32Host(h: string): void;
   refreshConfig(): void;
   pingEsp32(): void;
@@ -100,6 +105,7 @@ interface BrainStore {
   addToast(msg: string, type?: 'ok' | 'err'): void;
   patchConfig(patch: Record<string, unknown>): void;
   removeConfig(patch: Record<string, unknown>): void;
+  setServoEnabled(name: string, enabled: boolean): void;
   setMode(modes: Record<string, unknown>): void;
 }
 
@@ -116,6 +122,16 @@ const LOG_SKIP_TOPICS = new Set(['/vision/detections']);
 // Pending WS ping (application-level /ping → /pong echo). Closure state so it
 // survives across messages without bloating the store.
 let wsPing: { token: string; sentAt: number; timer: ReturnType<typeof setTimeout> } | null = null;
+
+// Pending esp32Connected=false update. The ESP32 ws_client.py waits 3 s before
+// reconnecting, so we allow up to 6 s before marking it disconnected.
+// Cancelled immediately if a "connected" notice arrives in the meantime.
+const ESP32_DISCONNECT_DEBOUNCE_MS = 6000;
+let esp32DisconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Pending "app disconnected" toast (minor debounce to smooth brief drops).
+const APP_DISCONNECT_DEBOUNCE_MS = 3000;
+let appDisconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useBrain = create<BrainStore>((set, get) => {
   // WebRTC 初期化 — brain からの中継映像 stream を store に格納
@@ -222,6 +238,57 @@ export const useBrain = create<BrainStore>((set, get) => {
       }
     }
 
+    // Connection notices from brain (app / esp32 connect・disconnect)
+    if (msg.op === 'notice') {
+      const n = msg as unknown as Record<string, unknown>;
+      if (n['source'] && n['event']) {
+        const source = n['source'] as string;
+        const ev     = n['event'] === 'connected' ? 'connected' : 'disconnected';
+
+        if (source === 'esp32') {
+          // ESP32 state is tracked in the store (not via toasts) so the Arm tab
+          // can show a persistent indicator without spurious flashes on reconnect.
+          if (ev === 'disconnected') {
+            esp32DisconnectTimer = setTimeout(() => {
+              esp32DisconnectTimer = null;
+              set({ esp32Connected: false });
+            }, ESP32_DISCONNECT_DEBOUNCE_MS);
+          } else {
+            if (esp32DisconnectTimer !== null) {
+              clearTimeout(esp32DisconnectTimer);
+              esp32DisconnectTimer = null;
+            }
+            const was = get().esp32Connected;
+            set({ esp32Connected: true });
+            // Toast when state changes: null (unknown) or false → true.
+            // Skipped only when already confirmed connected (was === true),
+            // which avoids duplicate toasts if the brain sends multiple notices.
+            if (was !== true) {
+              get().addToast('smabo-esp32 connected', 'ok');
+            }
+          }
+        } else {
+          // app (and any future sources): simple debounced toast
+          const label = 'smabo-app';
+          if (ev === 'disconnected') {
+            appDisconnectTimer = setTimeout(() => {
+              appDisconnectTimer = null;
+              get().addToast(`${label} disconnected`);
+            }, APP_DISCONNECT_DEBOUNCE_MS);
+          } else {
+            if (appDisconnectTimer !== null) {
+              clearTimeout(appDisconnectTimer);
+              appDisconnectTimer = null;
+            }
+            get().addToast(`${label} connected`, 'ok');
+          }
+        }
+      } else if (typeof n['message'] === 'string') {
+        get().addToast(n['message'] as string);
+      }
+      return;
+    }
+
     // Add to log (skip high-frequency / large topics to avoid render overhead)
     if (!msg.topic || !LOG_SKIP_TOPICS.has(msg.topic)) {
       get().addLog({
@@ -232,18 +299,25 @@ export const useBrain = create<BrainStore>((set, get) => {
     }
   });
 
+  let wasConnected = false;
   brain.onStatus((s: ConnStatus) => {
     set({ status: s });
     if (s === 'connected') {
+      wasConnected = true;
       get().addLog({ type: 'info', text: 'Brain connected' });
       get().addToast('Brain connected', 'ok');
     } else if (s === 'disconnected') {
       get().addLog({ type: 'info', text: 'Brain disconnected' });
-      get().addToast('Brain disconnected');
-      webrtc.close();
-      set({ previewOn: false, webrtcStream: null });
+      if (wasConnected) get().addToast('Brain disconnected');
+      wasConnected = false;
+      // Brain が切れたら ESP32 状態も不明に戻す。再接続時にスナップショットで確定する。
+      if (esp32DisconnectTimer !== null) {
+        clearTimeout(esp32DisconnectTimer);
+        esp32DisconnectTimer = null;
+      }
+      set({ previewOn: false, webrtcStream: null, esp32Connected: null });
     } else if (s === 'error') {
-      get().addToast('Connection error', 'err');
+      if (wasConnected) get().addToast('Connection error', 'err');
     }
   });
 
@@ -254,12 +328,12 @@ export const useBrain = create<BrainStore>((set, get) => {
   }, 1000);
 
   const initialEsp32Host =
-    (typeof localStorage !== 'undefined' && localStorage.getItem(ESP32_HOST_KEY)) || '';
+    (typeof localStorage !== 'undefined' && localStorage.getItem(ESP32_HOST_KEY)) || 'smabo-esp32.local';
   esp32.setHost(initialEsp32Host);
 
   return {
     status: 'disconnected',
-    host: 'localhost:9090',
+    host: 'smabo-brain.local:9090',
     esp32Host: initialEsp32Host,
     msgRate: 0,
 
@@ -278,6 +352,7 @@ export const useBrain = create<BrainStore>((set, get) => {
     visionMarkers: null,
 
     esp32Config: null,
+    esp32Connected: null,
 
     esp32Ping: null,
     esp32WsPing: null,
@@ -288,6 +363,15 @@ export const useBrain = create<BrainStore>((set, get) => {
     setHost: (h) => set({ host: h }),
 
     connect: () => {
+      const { host, status } = get();
+      if (status === 'connected' || status === 'connecting') {
+        brain.disconnect();
+      } else {
+        brain.connect(host);
+      }
+    },
+
+    autoConnect: () => {
       const { host } = get();
       brain.connect(host);
     },
@@ -302,7 +386,6 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.getConfig()
         .then(config => {
           set({ esp32Config: config });
-          get().addToast('Config loaded', 'ok');
         })
         .catch(() => get().addToast('Failed to load config', 'err'));
     },
@@ -402,6 +485,18 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.setConfig(patch)
         .then(() => get().refreshConfig())
         .catch(() => get().addToast('Failed to send config', 'err'));
+    },
+
+    setServoEnabled: (name, enabled) => {
+      const patch = { servos: { joints: { [name]: { enabled } } } };
+      // Optimistic update
+      set(s => ({
+        esp32Config: s.esp32Config ? deepMerge(s.esp32Config, patch) : patch,
+      }));
+      // Send to ESP32, then refresh to get last_angle written by ESP32
+      esp32.setConfig(patch)
+        .then(() => get().refreshConfig())
+        .catch(() => get().addToast('Failed to update servo', 'err'));
     },
 
     setMode: (modes) => {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useBrain } from './store/useBrain';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { Drive } from './tabs/Drive';
@@ -27,6 +28,13 @@ const TABS: { id: TabId; label: string }[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('face');
+  const autoConnect = useBrain(s => s.autoConnect);
+  const refreshConfig = useBrain(s => s.refreshConfig);
+
+  useEffect(() => {
+    autoConnect();
+    refreshConfig();
+  }, []);
 
   return (
     <>

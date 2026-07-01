@@ -582,6 +582,16 @@ input[type="checkbox"] {
   padding: 10px;
 }
 
+.servo-card--free {
+  opacity: .45;
+  border-color: var(--line);
+}
+
+.arm-servos--disconnected {
+  opacity: .35;
+  pointer-events: none;
+}
+
 .servo-name {
   font-size: .8rem;
   color: var(--orange);
@@ -648,7 +658,7 @@ summary::before {
   transition: transform .15s;
 }
 
-details[open] summary::before {
+details[open] > summary::before {
   transform: rotate(90deg);
 }
 

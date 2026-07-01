@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 
-/** Drag-and-drop reorder hook. Order is persisted to localStorage. */
-export function useDragOrder(storageKey: string) {
+/** Drag-and-drop reorder hook. Order is persisted to localStorage.
+ *  onSave is called with the new order after every successful drag-drop. */
+export function useDragOrder(storageKey: string, onSave?: (order: string[]) => void) {
   const [order, setOrder] = useState<string[]>(() => {
     try {
       const v = localStorage.getItem(storageKey);
@@ -51,6 +52,7 @@ export function useDragOrder(storageKey: string) {
           next.splice(fi, 1);
           next.splice(ti, 0, src);
           localStorage.setItem(storageKey, JSON.stringify(next));
+          onSave?.(next);
           return next;
         });
         dragging.current = null;
@@ -58,5 +60,5 @@ export function useDragOrder(storageKey: string) {
     };
   }
 
-  return { sort, handleProps, dropProps };
+  return { sort, handleProps, dropProps, order };
 }
