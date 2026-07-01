@@ -129,7 +129,7 @@ function InlineStr({ value, onChange, isPassword, w = 120 }: {
 // Number input that commits on blur or Enter — no Send button needed.
 
 function InlineNum({ value, onChange, isInt, w = 50 }: {
-  value: number; onChange: (v: number) => void; isInt?: boolean; w?: number;
+  value: number; onChange: (v: number) => void; isInt?: boolean; w?: number | string;
 }) {
   const [local, setLocal] = useState(String(value));
   useEffect(() => { setLocal(String(value)); }, [value]);
@@ -139,7 +139,7 @@ function InlineNum({ value, onChange, isInt, w = 50 }: {
   };
   return (
     <input
-      type="number" value={local} step={isInt ? 1 : 'any'}
+      type="text" inputMode={isInt ? 'numeric' : 'decimal'} value={local}
       style={{ width: w, fontSize: '.72rem', padding: '1px 4px', textAlign: 'right',
                background: 'transparent', border: '1px solid var(--line)',
                borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}
@@ -168,80 +168,121 @@ function ServoTable({ joints, rgroups, sorted, patch, removeConfig, setServoEnab
   const behaviorFor = (groups: Record<string, unknown>[]) =>
     groups.some(g => arr<string>(g['joints']).length > 0) ? 'random' : 'manual';
 
-  const setMode = (name: string, val: string) => {
-    const without: Record<string, unknown>[] = rgroups.map(g => ({ ...g, joints: arr<string>(g['joints']).filter(j => j !== name) }));
+  const without = (name: string): Record<string, unknown>[] =>
+    rgroups.map(g => ({ ...g, joints: arr<string>(g['joints']).filter(j => j !== name) }));
+
+  const setMode = (name: string, val: 'manual' | 'random') => {
+    const w = without(name);
     if (val === 'manual') {
-      patch({ servos: { behavior: behaviorFor(without), random_groups: without } });
+      patch({ servos: { behavior: behaviorFor(w), random_groups: w } });
     } else {
-      const updated = without.map(g => s(g['name']) === val ? { ...g, joints: [...arr<string>(g['joints']), name] } : g);
+      // assign to first group when switching to random
+      const first = rgroups[0] ? s(rgroups[0]['name']) : null;
+      if (!first) return;
+      const updated = w.map(g => s(g['name']) === first ? { ...g, joints: [...arr<string>(g['joints']), name] } : g);
       patch({ servos: { behavior: 'random', random_groups: updated } });
     }
   };
 
-  // Grid columns: handle | enable | name | ch | min° | max° | init° | speed | min_us | max_us | inv | mode | ×
-  const cols = '18px 28px 1fr 38px 50px 50px 50px 54px 56px 60px 28px auto 22px';
-  const hdr: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
-                                      padding: '1px 1px 5px', whiteSpace: 'nowrap' };
-  const cell: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 1px' };
+  const setGroup = (name: string, groupName: string) => {
+    const w = without(name);
+    const updated = w.map(g => s(g['name']) === groupName ? { ...g, joints: [...arr<string>(g['joints']), name] } : g);
+    patch({ servos: { behavior: 'random', random_groups: updated } });
+  };
+
+  // th padding-right=5px aligns header text with input digits (input: padding-right 4px + border 1px)
+  const th: React.CSSProperties = {
+    fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
+    padding: '2px 5px 6px 6px', whiteSpace: 'nowrap', textAlign: 'right',
+  };
+  const td: React.CSSProperties = { padding: '2px 0 2px 6px' };
   const selStyle: React.CSSProperties = { fontSize: '.72rem', padding: '1px 2px', background: 'transparent',
-                                           border: '1px solid var(--line)', borderRadius: 3, color: 'var(--ink)' };
+                                           border: '1px solid var(--line)', borderRadius: 3, color: 'var(--ink)',
+                                           textAlign: 'right' };
+
+  const numTh: React.CSSProperties = { ...th, minWidth: 56, width: 56 };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: cols, columnGap: 4,
-                  alignItems: 'center', overflowX: 'auto', marginBottom: 4 }}>
-      {/* header */}
-      {(['','','name','ch','min°','max°','init°','speed','min µs','max µs','inv','mode',''] as const)
-        .map(h => <span key={h} style={hdr}>{h}</span>)}
-
-      {/* rows */}
-      {sorted.map(name => {
-        const jv = joints[name];
-        if (!jv) return null;
-        const j = rec(jv);
-        const enabled = j['enabled'] !== false;
-        const inGroup = rgroups.find(g => arr<string>(g['joints']).includes(name));
-        const jp = (f: string, v: unknown) => patch({ servos: { joints: { [name]: { [f]: v } } } });
-        return (
-          <div key={name} style={{ display: 'contents' }} {...dropProps(name, allNames)}>
-            <span style={{ ...cell, cursor: 'grab', color: 'var(--muted)' }}
-              {...handleProps(name)}>⠿</span>
-            <span style={cell}>
-              <input type="checkbox" checked={enabled}
-                onChange={() => setServoEnabled(name, !enabled)} />
-            </span>
-            <span style={{ ...cell, fontSize: '.76rem',
-                           color: enabled ? 'var(--ink)' : 'var(--muted)',
-                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {name}</span>
-            <span style={cell}><InlineNum value={n(j['channel'])}       isInt w={38} onChange={v => jp('channel',    v)} /></span>
-            <span style={cell}><InlineNum value={n(j['min_angle'], -90)}      w={50} onChange={v => jp('min_angle',  v)} /></span>
-            <span style={cell}><InlineNum value={n(j['max_angle'],  90)}      w={50} onChange={v => jp('max_angle',  v)} /></span>
-            <span style={cell}><InlineNum value={n(j['init_angle'])}          w={50} onChange={v => jp('init_angle', v)} /></span>
-            <span style={cell}><InlineNum value={n(j['max_speed'],  90)}      w={54} onChange={v => jp('max_speed',  v)} /></span>
-            <span style={cell}><InlineNum value={n(j['min_us'],    500)} isInt w={56} onChange={v => jp('min_us',    v)} /></span>
-            <span style={cell}><InlineNum value={n(j['max_us'],   2500)} isInt w={60} onChange={v => jp('max_us',    v)} /></span>
-            <span style={cell}>
-              <input type="checkbox" checked={b(j['invert'])}
-                onChange={e => jp('invert', e.target.checked)} />
-            </span>
-            <span style={cell}>
-              <select value={inGroup ? s(inGroup['name']) : 'manual'}
-                style={{ ...selStyle, color: inGroup ? 'var(--orange)' : 'var(--ink)' }}
-                onChange={e => setMode(name, e.target.value)}>
-                <option value="manual">manual</option>
-                {rgroups.map(g => <option key={s(g['name'])} value={s(g['name'])}>random ({s(g['name'])})</option>)}
-              </select>
-            </span>
-            <span style={cell}>
-              <button
-                style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
-                         background: 'transparent', border: '1px solid var(--line)',
-                         borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
-                onClick={() => { if (confirm(`Delete "${name}"?`)) removeConfig({ servos: { joints: { [name]: null } } }); }}>×</button>
-            </span>
-          </div>
-        );
-      })}
+    <div style={{ overflowX: 'auto', marginBottom: 4 }}>
+      <table style={{ borderCollapse: 'collapse', tableLayout: 'auto', fontSize: '.72rem' }}>
+        <thead>
+          <tr>
+            <th style={{ ...th, padding: '2px 6px 6px 0', width: 20 }}></th>
+            <th style={{ ...th, textAlign: 'center', width: 28 }}></th>
+            <th style={{ ...th, textAlign: 'left', width: 100 }}>name</th>
+            <th style={numTh}>ch</th>
+            <th style={numTh}>min°</th>
+            <th style={numTh}>max°</th>
+            <th style={numTh}>default°</th>
+            <th style={numTh}>speed</th>
+            <th style={numTh}>min µs</th>
+            <th style={numTh}>max µs</th>
+            <th style={{ ...th, textAlign: 'center', width: 44 }}>invert</th>
+            <th style={{ ...th, whiteSpace: 'nowrap' }}>mode</th>
+            <th style={th}>group</th>
+            <th style={{ ...th, width: 26 }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(name => {
+            const jv = joints[name];
+            if (!jv) return null;
+            const j = rec(jv);
+            const enabled = j['enabled'] !== false;
+            const inGroup = rgroups.find(g => arr<string>(g['joints']).includes(name));
+            const jp = (f: string, v: unknown) => patch({ servos: { joints: { [name]: { [f]: v } } } });
+            return (
+              <tr key={name} {...dropProps(name, allNames)}>
+                <td style={{ ...td, padding: '2px 6px 2px 0', cursor: 'grab', color: 'var(--muted)' }}
+                  {...handleProps(name)}>⠿</td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <input type="checkbox" checked={enabled}
+                    onChange={() => setServoEnabled(name, !enabled)} />
+                </td>
+                <td style={{ ...td, fontSize: '.76rem', color: enabled ? 'var(--ink)' : 'var(--muted)',
+                             maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {name}
+                </td>
+                <td style={td}><InlineNum value={n(j['channel'])}        isInt w="100%" onChange={v => jp('channel',    v)} /></td>
+                <td style={td}><InlineNum value={n(j['min_angle'],  -90)}       w="100%" onChange={v => jp('min_angle',  v)} /></td>
+                <td style={td}><InlineNum value={n(j['max_angle'],   90)}       w="100%" onChange={v => jp('max_angle',  v)} /></td>
+                <td style={td}><InlineNum value={n(j['init_angle'])}            w="100%" onChange={v => jp('init_angle', v)} /></td>
+                <td style={td}><InlineNum value={n(j['max_speed'],   90)}       w="100%" onChange={v => jp('max_speed',  v)} /></td>
+                <td style={td}><InlineNum value={n(j['min_us'],     500)} isInt w="100%" onChange={v => jp('min_us',     v)} /></td>
+                <td style={td}><InlineNum value={n(j['max_us'],    2500)} isInt w="100%" onChange={v => jp('max_us',     v)} /></td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <input type="checkbox" checked={b(j['invert'])}
+                    onChange={e => jp('invert', e.target.checked)} />
+                </td>
+                <td style={td}>
+                  <select value={inGroup ? 'random' : 'manual'}
+                    style={{ ...selStyle, width: '100%' }}
+                    onChange={e => setMode(name, e.target.value as 'manual' | 'random')}>
+                    <option value="manual">manual</option>
+                    <option value="random" disabled={rgroups.length === 0}>random</option>
+                  </select>
+                </td>
+                <td style={td}>
+                  <select value={inGroup ? s(inGroup['name']) : ''}
+                    disabled={!inGroup}
+                    style={{ ...selStyle, width: '100%', color: inGroup ? 'var(--orange)' : 'var(--muted)' }}
+                    onChange={e => setGroup(name, e.target.value)}>
+                    {!inGroup && <option value="">—</option>}
+                    {rgroups.map(g => <option key={s(g['name'])} value={s(g['name'])}>{s(g['name'])}</option>)}
+                  </select>
+                </td>
+                <td style={{ ...td, paddingLeft: 4 }}>
+                  <button
+                    style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
+                             background: 'transparent', border: '1px solid var(--line)',
+                             borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
+                    onClick={() => { if (confirm(`Delete "${name}"?`)) removeConfig({ servos: { joints: { [name]: null } } }); }}>×</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -270,50 +311,64 @@ function RandomGroupSettings({ rgroups, patch }: {
     patch({ servos: { behavior: behaviorFor(updated), random_groups: updated } });
   };
 
-  // columns: name | joints | iv min | iv max | saccade | drift | center_pull | drift_spd | long_pause | ×
-  const cols = '1fr auto 44px 44px 54px 50px 58px 58px 58px 22px';
-  const hdr: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
-                                      padding: '1px 1px 5px', whiteSpace: 'nowrap' };
-  const cell: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 1px' };
+  const th: React.CSSProperties = {
+    fontSize: '.68rem', color: 'var(--dim)', fontWeight: 600,
+    padding: '2px 5px 6px 6px', whiteSpace: 'nowrap', textAlign: 'right',
+  };
+  const td: React.CSSProperties = { padding: '2px 0 2px 6px' };
+
+  const numTh: React.CSSProperties = { ...th, width: 88 };
 
   return (
     <>
       <SectionHeader>Random groups</SectionHeader>
-      <div style={{ display: 'grid', gridTemplateColumns: cols, columnGap: 4,
-                    alignItems: 'center', overflowX: 'auto', marginBottom: 4 }}>
-        {/* header */}
-        {(['name','joints','iv min','iv max','saccade','drift','center_pull','drift_spd','long_pause',''] as const)
-          .map(h => <span key={h} style={hdr}>{h}</span>)}
-
-        {/* rows */}
-        {rgroups.map(g => {
-          const gn  = s(g['name']);
-          const iv  = arr<number>(g['interval']);
-          const jts = arr<string>(g['joints']);
-          return (
-            <React.Fragment key={gn}>
-              <span style={{ ...cell, fontSize: '.76rem', color: 'var(--orange)',
-                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gn}</span>
-              <span style={{ ...cell, fontSize: '.68rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                {jts.length > 0 ? jts.join(', ') : '—'}
-              </span>
-              <span style={cell}><InlineNum value={n(iv[0], 1)} w={44} onChange={v => updGroup(gn, { interval: [v, n(iv[1], 3)] })} /></span>
-              <span style={cell}><InlineNum value={n(iv[1], 3)} w={44} onChange={v => updGroup(gn, { interval: [n(iv[0], 1), v] })} /></span>
-              <span style={cell}><InlineNum value={n(g['saccade_prob'],   0.18)} w={54} onChange={v => updGroup(gn, { saccade_prob: v })} /></span>
-              <span style={cell}><InlineNum value={n(g['drift'],          0.07)} w={50} onChange={v => updGroup(gn, { drift: v })} /></span>
-              <span style={cell}><InlineNum value={n(g['center_pull'],    0.12)} w={58} onChange={v => updGroup(gn, { center_pull: v })} /></span>
-              <span style={cell}><InlineNum value={n(g['drift_speed'],    0.40)} w={58} onChange={v => updGroup(gn, { drift_speed: v })} /></span>
-              <span style={cell}><InlineNum value={n(g['long_pause_prob'],0.22)} w={58} onChange={v => updGroup(gn, { long_pause_prob: v })} /></span>
-              <span style={cell}>
-                <button
-                  style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
-                           background: 'transparent', border: '1px solid var(--line)',
-                           borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
-                  onClick={() => deleteGroup(gn)}>×</button>
-              </span>
-            </React.Fragment>
-          );
-        })}
+      <div style={{ overflowX: 'auto', marginBottom: 4 }}>
+        <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '.72rem' }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>name</th>
+              <th style={{ ...th, textAlign: 'left' }}>joints</th>
+              <th style={numTh}>interval min</th>
+              <th style={numTh}>interval max</th>
+              <th style={numTh}>saccade</th>
+              <th style={numTh}>drift</th>
+              <th style={numTh}>center pull</th>
+              <th style={numTh}>drift speed</th>
+              <th style={numTh}>long pause</th>
+              <th style={{ ...th, width: 26 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rgroups.map(g => {
+              const gn  = s(g['name']);
+              const iv  = arr<number>(g['interval']);
+              const jts = arr<string>(g['joints']);
+              return (
+                <tr key={gn}>
+                  <td style={{ ...td, paddingLeft: 0, fontSize: '.76rem', color: 'var(--orange)',
+                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gn}</td>
+                  <td style={{ ...td, fontSize: '.68rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {jts.length > 0 ? jts.join(', ') : '—'}
+                  </td>
+                  <td style={td}><InlineNum value={n(iv[0], 1)}                  w="100%" onChange={v => updGroup(gn, { interval: [v, n(iv[1], 3)] })} /></td>
+                  <td style={td}><InlineNum value={n(iv[1], 3)}                  w="100%" onChange={v => updGroup(gn, { interval: [n(iv[0], 1), v] })} /></td>
+                  <td style={td}><InlineNum value={n(g['saccade_prob'],   0.18)} w="100%" onChange={v => updGroup(gn, { saccade_prob: v })} /></td>
+                  <td style={td}><InlineNum value={n(g['drift'],          0.07)} w="100%" onChange={v => updGroup(gn, { drift: v })} /></td>
+                  <td style={td}><InlineNum value={n(g['center_pull'],    0.12)} w="100%" onChange={v => updGroup(gn, { center_pull: v })} /></td>
+                  <td style={td}><InlineNum value={n(g['drift_speed'],    0.40)} w="100%" onChange={v => updGroup(gn, { drift_speed: v })} /></td>
+                  <td style={td}><InlineNum value={n(g['long_pause_prob'],0.22)} w="100%" onChange={v => updGroup(gn, { long_pause_prob: v })} /></td>
+                  <td style={{ ...td, paddingLeft: 4 }}>
+                    <button
+                      style={{ fontSize: '.65rem', padding: '0 4px', lineHeight: '18px',
+                               background: 'transparent', border: '1px solid var(--line)',
+                               borderRadius: 3, color: 'var(--muted)', cursor: 'pointer' }}
+                      onClick={() => deleteGroup(gn)}>×</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
       <button style={{ fontSize: '.75rem', marginTop: 4 }} onClick={() => {
         const gname = prompt('Group name:')?.trim();
