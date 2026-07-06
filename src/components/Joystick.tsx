@@ -5,17 +5,20 @@ interface JoystickProps {
   maxAng: number;
   onCmd: (lin: number, ang: number) => void;
   onStop: () => void;
+  disabled?: boolean;
 }
 
 const SIZE = 200;
 const RADIUS = SIZE / 2 - 10;
 const STICK_R = 20;
 
-export function Joystick({ maxLin, maxAng, onCmd, onStop }: JoystickProps) {
+export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: JoystickProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stickRef = useRef({ x: 0, y: 0 }); // normalized -1..1
   const draggingRef = useRef(false);
   const keysRef = useRef({ w: false, a: false, s: false, d: false, space: false });
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -83,6 +86,17 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop }: JoystickProps) {
   useEffect(() => {
     draw();
   }, [draw]);
+
+  // When disabled, immediately stop and reset stick
+  const onStopRef = useRef(onStop);
+  onStopRef.current = onStop;
+  useEffect(() => {
+    if (disabled) {
+      stickRef.current = { x: 0, y: 0 };
+      draw();
+      onStopRef.current();
+    }
+  }, [disabled, draw]);
 
   // Mouse events
   useEffect(() => {
@@ -199,12 +213,18 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop }: JoystickProps) {
   maxAngRef.current = maxAng;
 
   const onCmdRef = useRef(onCmd);
-  const onStopRef = useRef(onStop);
   onCmdRef.current = onCmd;
-  onStopRef.current = onStop;
 
   useEffect(() => {
     const interval = setInterval(() => {
+      if (disabledRef.current) {
+        if (stickRef.current.x !== 0 || stickRef.current.y !== 0) {
+          stickRef.current = { x: 0, y: 0 };
+          draw();
+        }
+        return;
+      }
+
       const k = keysRef.current;
 
       if (k.space) {
@@ -233,7 +253,10 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop }: JoystickProps) {
 
       const { x, y } = stickRef.current;
       if (x !== 0 || y !== 0) {
-        onCmdRef.current(y * maxLinRef.current, -x * maxAngRef.current);
+        const lin = y * maxLinRef.current;
+        const effLin = Math.abs(y) < 0.2 ? 0 : lin; // spin zone: pure rotation when near-horizontal
+        const angSign = effLin < 0 ? 1 : -1;          // reverse ang direction when reversing
+        onCmdRef.current(effLin, angSign * x * maxAngRef.current);
       }
     }, 80);
 
@@ -241,7 +264,10 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop }: JoystickProps) {
   }, [draw]);
 
   return (
-    <div className="drive-center">
+    <div
+      className="drive-center"
+      style={disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+    >
       <canvas
         ref={canvasRef}
         width={SIZE}

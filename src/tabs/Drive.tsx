@@ -12,6 +12,12 @@ export function Drive() {
   const odom = useBrain(s => s.odom);
   const trail = useBrain(s => s.trail);
   const clearTrail = useBrain(s => s.clearTrail);
+  const visionConfig = useBrain(s => s.visionConfig);
+  const visionDriveActive = !!(
+    visionConfig?.enabled &&
+    visionConfig.mode !== 'off' &&
+    visionConfig.behaviors.drive
+  );
   const { sort, handleProps, dropProps } = useDragOrder('smabo-drive-order');
 
   const [maxLin, setMaxLin] = useState(0.3);
@@ -120,7 +126,18 @@ export function Drive() {
     if (k === 'joystick') return (
       <div key="joystick" className="drive-col-joystick" {...drop}>
         <span className="drag-handle" {...hdl}>⠿</span>
-        <Joystick maxLin={maxLin} maxAng={maxAng} onCmd={handleCmd} onStop={handleStop} />
+        {visionDriveActive && (
+          <div className="expr-hint" style={{ marginBottom: 8 }}>
+            🟢 <b>Vision is controlling drive</b> (/cmd_vel). Disable "Drive follow" in the Vision tab to drive manually.
+          </div>
+        )}
+        <Joystick
+          maxLin={maxLin}
+          maxAng={maxAng}
+          onCmd={handleCmd}
+          onStop={handleStop}
+          disabled={visionDriveActive}
+        />
       </div>
     );
 

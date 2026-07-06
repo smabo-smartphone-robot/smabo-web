@@ -31,6 +31,12 @@ export function Vision() {
   const webrtcStream = useBrain(s => s.webrtcStream);
   const previewOn    = useBrain(s => s.previewOn);
   const setPreview   = useBrain(s => s.setPreview);
+  const esp32Config  = useBrain(s => s.esp32Config);
+
+  const jointNames: string[] = Object.keys(
+    (esp32Config as Record<string, unknown> & { servos?: { joints?: Record<string, unknown> } })
+      ?.servos?.joints ?? {}
+  );
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -223,6 +229,19 @@ export function Vision() {
             onChange={e => setVisionConfig({ behaviors: { look_at: e.target.checked } })}
           />
         </div>
+        {cfg.behaviors.look_at && !cfg.behaviors.servo && (
+          <div className="behavior-settings">
+            <div className="config-field">
+              <label>Lost tolerance (frames)</label>
+              <input
+                type="number"
+                min={0} max={60} step={1}
+                value={cfg.target_joints.lost_tolerance ?? 0}
+                onChange={e => setVisionConfig({ target_joints: { lost_tolerance: Number(e.target.value) } })}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="config-field">
           <label>Servo follow (/servo/command)</label>
@@ -236,30 +255,81 @@ export function Vision() {
           <div className="behavior-settings">
             <div className="config-field">
               <label>Pan joint (horizontal)</label>
-              <input
-                type="text"
+              <select
                 value={cfg.target_joints.pan}
                 onChange={e => setVisionConfig({ target_joints: { pan: e.target.value } })}
-              />
+              >
+                <option value="">(none)</option>
+                {jointNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
             <div className="config-field">
               <label>Tilt joint (vertical)</label>
-              <input
-                type="text"
+              <select
                 value={cfg.target_joints.tilt}
                 onChange={e => setVisionConfig({ target_joints: { tilt: e.target.value } })}
-              />
+              >
+                <option value="">(none)</option>
+                {jointNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
             <div className="expr-hint" style={{ marginTop: -4, marginBottom: 8 }}>
               Joint that follows left/right (pan) and the joint that follows up/down (tilt). Leave one blank to follow on that axis only.
             </div>
             <div className="config-field">
-              <label>Servo gain</label>
+              <label>Pan direction</label>
+              <select
+                value={cfg.target_joints.pan_sign ?? 1}
+                onChange={e => setVisionConfig({ target_joints: { pan_sign: Number(e.target.value) } })}
+              >
+                <option value={1}>normal (+1)</option>
+                <option value={-1}>reversed (−1)</option>
+              </select>
+            </div>
+            <div className="config-field">
+              <label>Tilt direction</label>
+              <select
+                value={cfg.target_joints.tilt_sign ?? 1}
+                onChange={e => setVisionConfig({ target_joints: { tilt_sign: Number(e.target.value) } })}
+              >
+                <option value={1}>normal (+1)</option>
+                <option value={-1}>reversed (−1)</option>
+              </select>
+            </div>
+            <div className="config-field">
+              <label>Kp (proportional)</label>
               <input
                 type="number"
-                min={0} max={5} step={0.1}
-                value={cfg.target_joints.gain}
-                onChange={e => setVisionConfig({ target_joints: { gain: Number(e.target.value) } })}
+                min={0} max={10} step={0.01}
+                value={cfg.target_joints.kp}
+                onChange={e => setVisionConfig({ target_joints: { kp: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Ki (integral)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.target_joints.ki}
+                onChange={e => setVisionConfig({ target_joints: { ki: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Kd (derivative)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.target_joints.kd}
+                onChange={e => setVisionConfig({ target_joints: { kd: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Lost tolerance (frames)</label>
+              <input
+                type="number"
+                min={0} max={60} step={1}
+                value={cfg.target_joints.lost_tolerance ?? 0}
+                onChange={e => setVisionConfig({ target_joints: { lost_tolerance: Number(e.target.value) } })}
               />
             </div>
           </div>
@@ -300,6 +370,71 @@ export function Vision() {
                 min={0.0} max={3.0} step={0.1}
                 value={cfg.drive.max_ang}
                 onChange={e => setVisionConfig({ drive: { max_ang: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="expr-hint" style={{ marginTop: 4, marginBottom: 4 }}>Angular PID</div>
+            <div className="config-field">
+              <label>Kp (proportional)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.kp_ang}
+                onChange={e => setVisionConfig({ drive: { kp_ang: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Ki (integral)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.ki_ang}
+                onChange={e => setVisionConfig({ drive: { ki_ang: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Kd (derivative)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.kd_ang}
+                onChange={e => setVisionConfig({ drive: { kd_ang: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="expr-hint" style={{ marginTop: 4, marginBottom: 4 }}>Linear PID</div>
+            <div className="config-field">
+              <label>Kp (proportional)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.kp_lin}
+                onChange={e => setVisionConfig({ drive: { kp_lin: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Ki (integral)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.ki_lin}
+                onChange={e => setVisionConfig({ drive: { ki_lin: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Kd (derivative)</label>
+              <input
+                type="number"
+                min={0} max={10} step={0.01}
+                value={cfg.drive.kd_lin}
+                onChange={e => setVisionConfig({ drive: { kd_lin: Number(e.target.value) } })}
+              />
+            </div>
+            <div className="config-field">
+              <label>Lost tolerance (frames)</label>
+              <input
+                type="number"
+                min={0} max={60} step={1}
+                value={cfg.drive.lost_tolerance ?? 0}
+                onChange={e => setVisionConfig({ drive: { lost_tolerance: Number(e.target.value) } })}
               />
             </div>
           </div>

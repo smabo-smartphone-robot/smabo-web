@@ -52,16 +52,22 @@ function getAllServos(config: Record<string, unknown> | null): ServoEntry[] {
 }
 
 export function Arm() {
-  const esp32Config   = useBrain(s => s.esp32Config);
-  const brainStatus   = useBrain(s => s.status);
+  const esp32Config    = useBrain(s => s.esp32Config);
+  const brainStatus    = useBrain(s => s.status);
   const esp32Connected = useBrain(s => s.esp32Connected);
-  const refreshConfig = useBrain(s => s.refreshConfig);
+  const refreshConfig  = useBrain(s => s.refreshConfig);
   const setServoEnabled = useBrain(s => s.setServoEnabled);
+  const visionConfig   = useBrain(s => s.visionConfig);
   const allServos = getAllServos(esp32Config);
 
   const brainOk = brainStatus === 'connected';
   // esp32Connected===null は未確認（接続直後）→ 楽観的に操作可能とする
   const connected = brainOk && esp32Connected !== false;
+  const visionServoActive = !!(
+    visionConfig?.enabled &&
+    visionConfig.mode !== 'off' &&
+    visionConfig.behaviors.servo
+  );
   const { sort, handleProps, dropProps } = useDragOrder('smabo-arm-order');
 
   const [angles, setAngles] = useState<Record<string, number>>(() => {
@@ -126,7 +132,7 @@ export function Arm() {
     <div className="arm-layout">
       <div className="arm-header">
         <button onClick={refreshConfig}>Get Config</button>
-        <button onClick={handleHome} disabled={!hasManual || !connected}>Home</button>
+        <button onClick={handleHome} disabled={!hasManual || !connected || visionServoActive}>Home</button>
       </div>
 
       {!connected && (
@@ -134,6 +140,12 @@ export function Arm() {
           {!brainOk
             ? 'Brain not connected — controls disabled.'
             : 'smabo-esp32 disconnected — controls disabled.'}
+        </div>
+      )}
+
+      {visionServoActive && (
+        <div className="expr-hint" style={{ marginBottom: 8 }}>
+          🟢 <b>Vision is controlling servos</b> (/servo/command). Disable "Servo follow" in the Vision tab to control manually.
         </div>
       )}
 
@@ -185,13 +197,13 @@ export function Arm() {
                         <input
                           type="range"
                           min={min} max={max} step={1} value={val}
-                          disabled={!connected}
+                          disabled={!connected || visionServoActive}
                           onChange={e => handleChange(name, Number(e.target.value))}
                         />
                         <span className="servo-val">{val.toFixed(0)}°</span>
                         <button
                           style={{ fontSize: '.68rem', padding: '1px 6px', flexShrink: 0 }}
-                          disabled={!connected}
+                          disabled={!connected || visionServoActive}
                           onClick={() => handleHomeOne(name, initAngle)}
                         >Home</button>
                       </div>

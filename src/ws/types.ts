@@ -39,7 +39,10 @@ export interface VisionTargetJoints {
   tilt: string;
   pan_sign: number;
   tilt_sign: number;
-  gain: number;
+  kp: number;
+  ki: number;
+  kd: number;
+  lost_tolerance: number;
 }
 
 export interface VisionBehaviors {
@@ -50,11 +53,16 @@ export interface VisionBehaviors {
 
 export interface VisionDrive {
   target_area_frac: number;
-  k_ang: number;
-  k_lin: number;
+  kp_ang: number;
+  ki_ang: number;
+  kd_ang: number;
+  kp_lin: number;
+  ki_lin: number;
+  kd_lin: number;
   max_ang: number;
   max_lin: number;
   deadzone: number;
+  lost_tolerance: number;
 }
 
 export interface VisionConfigMsg {
