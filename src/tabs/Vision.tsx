@@ -346,13 +346,22 @@ export function Vision() {
         {cfg.behaviors.drive && (
           <div className="behavior-settings">
             <div className="config-field">
-              <label>Target size (frac)</label>
+              <label>Target size</label>
               <input
-                type="number"
-                min={0.01} max={0.9} step={0.01}
-                value={cfg.drive.target_area_frac}
-                onChange={e => setVisionConfig({ drive: { target_area_frac: Number(e.target.value) } })}
+                type="range"
+                min={1} max={90} step={0.5}
+                value={+(cfg.drive.target_area_frac * 100).toFixed(2)}
+                onChange={e => setVisionConfig({ drive: { target_area_frac: Number(e.target.value) / 100 } })}
               />
+              <span className="val">
+                {(() => {
+                  if (imgW > 0 && imgH > 0) {
+                    const side = Math.round(Math.sqrt(cfg.drive.target_area_frac * imgW * imgH));
+                    return `target side ≈ ${side}px`;
+                  }
+                  return `${(cfg.drive.target_area_frac * 100).toFixed(2)}%`;
+                })()}
+              </span>
             </div>
             <div className="config-field">
               <label>Max linear (m/s)</label>
@@ -486,6 +495,19 @@ export function Vision() {
                   height: `${(side / imgH * 100).toFixed(1)}%`,
                 }}
                 title={`Min detection size: ${Math.round(side)}×${Math.round(side)}px`}
+              />
+            );
+          })()}
+          {imgW > 0 && imgH > 0 && cfg.behaviors.drive && cfg.drive.target_area_frac > 0 && (() => {
+            const side = Math.sqrt(cfg.drive.target_area_frac * imgW * imgH);
+            return (
+              <div
+                className="vision-target-size"
+                style={{
+                  width: `${(side / imgW * 100).toFixed(1)}%`,
+                  height: `${(side / imgH * 100).toFixed(1)}%`,
+                }}
+                title={`Drive follow target size: ${Math.round(side)}×${Math.round(side)}px`}
               />
             );
           })()}

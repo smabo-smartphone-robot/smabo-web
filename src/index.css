@@ -556,6 +556,21 @@ input[type="checkbox"] {
   min-height: 3px;
 }
 
+/* Target-size reference rectangle — shown centered in the camera preview
+   while Drive follow is on. This is the apparent size drive follow tries to
+   hold by moving forward/back (drive.target_area_frac). */
+.vision-target-size {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px dashed rgba(0, 200, 255, 0.85);
+  background: rgba(0, 200, 255, 0.08);
+  pointer-events: none;
+  min-width: 3px;
+  min-height: 3px;
+}
+
 /* ===== Arm Tab ===== */
 .arm-layout {
   display: flex;
