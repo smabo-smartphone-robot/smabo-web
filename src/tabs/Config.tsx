@@ -537,7 +537,7 @@ export function Config() {
                 <span style={lbl}>wheel_radius (m)</span>
                 <InlineNum value={n(dc['wheel_radius'], 0.03)} w={60} onChange={v => patch({ dc: { wheel_radius: v } })} />
                 <span style={lbl}>wheel_separation (m)</span>
-                <InlineNum value={n(dc['wheel_separation'], 0.15)} w={60} onChange={v => patch({ dc: { wheel_separation: v } })} />
+                <InlineNum value={n(dc['wheel_separation'], 0.13)} w={60} onChange={v => patch({ dc: { wheel_separation: v } })} />
                 <span style={lbl}>pwm_freq (Hz)</span>
                 <InlineNum value={n(dc['pwm_freq'], 1000)} isInt w={60} onChange={v => patch({ dc: { pwm_freq: v } })} />
                 <span style={lbl}>cmd_timeout (s)</span>
