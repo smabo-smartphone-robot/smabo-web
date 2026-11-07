@@ -36,6 +36,7 @@ const ROSBRIDGE_SUBSCRIBE: Record<string, string> = {
   '/vision/detections':  'vision_msgs/msg/Detection2DArray',
   '/vision/markers':     'std_msgs/msg/String',
   '/webrtc/web_offer':   'std_msgs/msg/String',
+  '/config_url':         'std_msgs/msg/String',
 };
 
 class BrainClient {

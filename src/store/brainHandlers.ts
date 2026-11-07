@@ -17,7 +17,8 @@ const RECOGNIZED_MAX = 50;
 
 // High-frequency topics with large payloads are excluded from the log, which
 // would otherwise re-render the Log panel on every frame.
-const LOG_SKIP_TOPICS = new Set(['/vision/detections']);
+// /config_url repeats every 5 s with the same value.
+const LOG_SKIP_TOPICS = new Set(['/vision/detections', '/config_url']);
 
 // The ESP32 waits 3 s before reconnecting, so allow up to 6 s before showing it
 // as disconnected; a "connected" notice in the meantime cancels it.
@@ -87,6 +88,17 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       case '/vision/markers': {
         const text = (raw as StringMsg)?.data;
         if (typeof text === 'string' && text) set({ visionMarkers: { text, t: Date.now() } });
+        break;
+      }
+      case '/config_url': {
+        // ESP32 (or smabo-sim) が知らせる REST config API の場所。ホスト欄を
+        // 手で合わせなくても、つながっているロボットの config を読み書きできる。
+        const url = (raw as StringMsg)?.data;
+        if (typeof url === 'string' && url && url !== get().esp32Host) {
+          get().setEsp32Host(url);
+          get().addLog({ type: 'info', text: `ESP32 config API: ${url}` });
+          get().refreshConfig();
+        }
         break;
       }
       case '/webrtc/web_offer': {

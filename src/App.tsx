@@ -8,13 +8,14 @@ import { useTemplate, useTree } from './layout/useLayout';
 
 export default function App() {
   const autoConnect = useBrain(s => s.autoConnect);
-  const refreshConfig = useBrain(s => s.refreshConfig);
+  const refreshConfigQuietly = useBrain(s => s.refreshConfigQuietly);
   const template = useTemplate();
   const tree = useTree();
 
   useEffect(() => {
     autoConnect();
-    refreshConfig();
+    // ESP32 may not be up yet; it announces /config_url once it reaches the brain.
+    refreshConfigQuietly();
   }, []);
 
   return (

@@ -68,6 +68,8 @@ export interface BrainStore {
   autoConnect(): void;
   setEsp32Host(h: string): void;
   refreshConfig(): void;
+  /** Automatic load (startup): no error toast if the ESP32 is not reachable yet. */
+  refreshConfigQuietly(): void;
   pingEsp32(): void;
   pingEsp32Ws(): void;
   clearRecognized(): void;
@@ -157,6 +159,12 @@ export const useBrain = create<BrainStore>((set, get) => {
           set({ esp32Config: config });
         })
         .catch(() => get().addToast('Failed to load config', 'err'));
+    },
+
+    refreshConfigQuietly: () => {
+      esp32.getConfig()
+        .then(config => set({ esp32Config: config }))
+        .catch(() => {});
     },
 
     pingEsp32: () => {
