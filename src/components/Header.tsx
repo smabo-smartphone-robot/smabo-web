@@ -1,4 +1,12 @@
 import { useBrain } from '../store/useBrain';
+import { useTheme, type ThemePref } from '../theme';
+import { useLayout, useTemplate } from '../layout/useLayout';
+
+const THEME_OPTIONS: { pref: ThemePref; label: string; title: string }[] = [
+  { pref: 'auto', label: 'Auto', title: 'Follow the OS setting' },
+  { pref: 'light', label: 'Light', title: 'Light theme' },
+  { pref: 'dark', label: 'Dark', title: 'Dark theme' },
+];
 
 export function Header() {
   const status = useBrain(s => s.status);
@@ -9,6 +17,11 @@ export function Header() {
   const connect = useBrain(s => s.connect);
   const setEsp32Host = useBrain(s => s.setEsp32Host);
   const refreshConfig = useBrain(s => s.refreshConfig);
+  const themePref = useTheme(s => s.pref);
+  const setThemePref = useTheme(s => s.setPref);
+  const customized = useLayout(s => s.edited != null);
+  const setPickerOpen = useLayout(s => s.setPickerOpen);
+  const templateTitle = useTemplate().title;
 
   const isConnectedOrConnecting = status === 'connected' || status === 'connecting';
   const btnLabel = isConnectedOrConnecting ? 'Disconnect' : 'Connect';
@@ -16,7 +29,18 @@ export function Header() {
   return (
     <header>
       <div className="hrow">
-        <h1>smabo-web</h1>
+        <h1>smabo<span className="brand-sub">web</span></h1>
+        <button
+          className="template-btn"
+          onClick={() => setPickerOpen(true)}
+          title="Choose a layout template"
+        >
+          <span className="template-btn-icon" aria-hidden>▦</span>
+          <span className="template-btn-name">{templateTitle}</span>
+          {customized && <span className="template-btn-edited" title="Changed from the saved layout">edited</span>}
+          <span className="template-btn-caret" aria-hidden>▾</span>
+        </button>
+        <div className="host-group">
         <div className={`dot ${status}`} title={status} />
         <input
           type="text"
@@ -26,8 +50,10 @@ export function Header() {
           style={{ width: 160 }}
           onKeyDown={e => { if (e.key === 'Enter') connect(); }}
         />
-        <button onClick={connect}>{btnLabel}</button>
+        <button className={isConnectedOrConnecting ? '' : 'primary'} onClick={connect}>{btnLabel}</button>
+        </div>
 
+        <div className="host-group">
         <input
           type="text"
           value={esp32Host}
@@ -37,8 +63,24 @@ export function Header() {
           onKeyDown={e => { if (e.key === 'Enter') refreshConfig(); }}
         />
         <button onClick={refreshConfig} disabled={!esp32Host}>Get Config</button>
+        </div>
 
         <span className="msg-rate">{msgRate} msg/s</span>
+
+        <div className="theme-seg" role="radiogroup" aria-label="Theme">
+          {THEME_OPTIONS.map(o => (
+            <button
+              key={o.pref}
+              role="radio"
+              aria-checked={themePref === o.pref}
+              className={themePref === o.pref ? 'on' : ''}
+              title={o.title}
+              onClick={() => setThemePref(o.pref)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   );

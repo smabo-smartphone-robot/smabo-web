@@ -29,7 +29,19 @@ class RosClient {
     this._setStatus('connecting');
     const url = /^wss?:\/\//.test(host) ? host : `ws://${host}`;
     const ros = new ROSLIB.Ros({ url });
-    ros.on('connection', () => this._setStatus('connected'));
+    ros.on('connection', () => {
+      // roslib 1.4 does not dispatch rosbridge's action ops; route them by goal id
+      // so sendActionGoal() gets its feedback / result.
+      const sock = (ros as unknown as { socket?: WebSocket }).socket;
+      sock?.addEventListener('message', (ev: MessageEvent) => {
+        if (typeof ev.data !== 'string' || !ev.data.includes('"action_')) return;
+        try {
+          const m = JSON.parse(ev.data);
+          if ((m?.op === 'action_result' || m?.op === 'action_feedback') && m.id) ros.emit(m.id, m);
+        } catch { /* ignore */ }
+      });
+      this._setStatus('connected');
+    });
     ros.on('error', () => this._setStatus('error'));
     ros.on('close', () => this._setStatus('disconnected'));
     this._ros = ros;
@@ -56,6 +68,21 @@ class RosClient {
     return () => t.unsubscribe();
   }
 
+  /** Call a ROS service over rosbridge; resolves with the response values. */
+  callService<T>(name: string, serviceType: string, req: Record<string, unknown>, timeoutMs = 10000): Promise<T> {
+    const ros = this._ros;
+    if (!ros) return Promise.reject(new Error('ROS not connected'));
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${name}: timeout`)), timeoutMs);
+      const srv = new ROSLIB.Service({ ros, name, serviceType });
+      srv.callService(
+        new ROSLIB.ServiceRequest(req),
+        (res: unknown) => { clearTimeout(timer); resolve(res as T); },
+        (err: unknown) => { clearTimeout(timer); reject(new Error(`${name}: ${String(err)}`)); },
+      );
+    });
+  }
+
   /**
    * Send a ROS 2 action goal via rosbridge's `send_action_goal` op and stream
    * feedback/result. Returns a cancel function. Typed loosely because action
@@ -68,6 +95,7 @@ class RosClient {
     handlers: {
       onFeedback?: (values: unknown) => void;
       onResult?: (values: unknown, status?: unknown) => void;
+      onError?: (message: string) => void;   // rosbridge rejected the goal (e.g. no action support)
     } = {},
   ): () => void {
     const ros = this._ros as unknown as {
@@ -82,13 +110,18 @@ class RosClient {
       if (msg?.op === 'action_feedback') handlers.onFeedback?.(msg.values);
       else if (msg?.op === 'action_result') { handlers.onResult?.(msg.values, msg.status); ros.off?.(id, onMsg); }
     };
+    const onStatus = (m: any) => {
+      if (m?.level === 'error') { handlers.onError?.(String(m.msg ?? 'rosbridge error')); ros.off?.(id, onMsg); }
+    };
     ros.on(id, onMsg);
+    ros.on(`status:${id}`, onStatus);
     ros.callOnConnection({
       op: 'send_action_goal', id, action, action_type: actionType, args, feedback: true,
     });
     return () => {
       try { ros.callOnConnection({ op: 'cancel_action_goal', id, action }); } catch { /* ignore */ }
       ros.off?.(id, onMsg);
+      ros.off?.(`status:${id}`, onStatus);
     };
   }
 

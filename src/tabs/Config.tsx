@@ -6,7 +6,7 @@ import { useDragOrder } from '../hooks/useDragOrder';
 // Verifies two paths:
 //   1. REST (web → ESP32 direct): GET /config ping
 //   2. WS telemetry (ESP32 → brain → web): freshness of /odom and /joint_states
-function Esp32CommCheck() {
+export function Esp32CommCheck() {
   const esp32Host = useBrain(s => s.esp32Host);
   const esp32Ping = useBrain(s => s.esp32Ping);
   const esp32WsPing = useBrain(s => s.esp32WsPing);
@@ -542,6 +542,8 @@ export function Config() {
                 <InlineNum value={n(dc['pwm_freq'], 1000)} isInt w={60} onChange={v => patch({ dc: { pwm_freq: v } })} />
                 <span style={lbl}>cmd_timeout (s)</span>
                 <InlineNum value={n(dc['cmd_timeout'], 0.5)} w={60} onChange={v => patch({ dc: { cmd_timeout: v } })} />
+                <span style={lbl} title="0 以外の指令の duty をこの値まで引き上げる（静止摩擦対策、0 = 無効）">min_duty (0-1)</span>
+                <InlineNum value={n(dc['min_duty'], 0)} w={60} onChange={v => patch({ dc: { min_duty: v } })} />
                 <span style={lbl}>invert_left</span>
                 <input type="checkbox" checked={b(dc['invert_left'])} onChange={e => patch({ dc: { invert_left: e.target.checked } })} />
                 <span style={lbl}>invert_right</span>

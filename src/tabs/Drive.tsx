@@ -8,7 +8,10 @@ import { useDragOrder } from '../hooks/useDragOrder';
 const DRIVE_PANELS = ['telem', 'joystick', 'trail'] as const;
 type DP = (typeof DRIVE_PANELS)[number];
 
-export function Drive() {
+export type DriveSection = DP;
+
+/** `sections` limits which columns are shown (all when omitted); used by layout templates. */
+export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const odom = useBrain(s => s.odom);
   const trail = useBrain(s => s.trail);
   const clearTrail = useBrain(s => s.clearTrail);
@@ -44,7 +47,7 @@ export function Drive() {
   };
 
   const fmt = (v: number, d = 3) => v.toFixed(d);
-  const sorted = sort(DRIVE_PANELS) as DP[];
+  const sorted = (sort(DRIVE_PANELS) as DP[]).filter(k => !sections || sections.includes(k));
 
   function renderPanel(k: DP) {
     const drop = dropProps(k, DRIVE_PANELS);

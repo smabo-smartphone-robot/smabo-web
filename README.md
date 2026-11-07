@@ -2,8 +2,8 @@
 
 smabo ロボットの操作・可視化用 web フロントエンド。
 
-中継サーバ **smabo-brain** に WebSocket クライアントとして接続し、
-走行・アーム操作・センサ可視化を行います。
+中継サーバ **smabo-brain**（または ROS 2 版の **smabo-brain-ros**）に WebSocket クライアントとして接続し、
+走行・サーボ操作・センサ可視化・画像処理の設定・ナビゲーション・動作計画を行います。
 ESP32 の設定変更は brain を介さず REST で直接行います。
 
 ```
@@ -47,23 +47,29 @@ python -m http.server --directory dist
 
 | 入力欄 | 接続先 | プロトコル |
 |--------|--------|------------|
-| Brain host:port | smabo-brain | `ws://<host>/ui` |
+| Brain host:port | smabo-brain / smabo-brain-ros | `ws://<host>/ui` |
 | ESP32 host (REST) | smabo-esp32 | `http://<host>/config`, `/mode` |
 
-- **Brain** 欄を入力して「接続」（または Enter）→ WebSocket 接続
-- **ESP32** 欄を入力して「Config 取得」（または Enter）→ `GET /config` で設定を取得
+- **Brain** 欄を入力して「Connect」（または Enter）→ WebSocket 接続
+- **ESP32** 欄を入力して「Get Config」（または Enter）→ `GET /config` で設定を取得
 
 送信トピックにはすべて `/web` prefix が自動付与されます（brain 側で剥がして再配信）。
+
+Navigation / Motion Plan タブは、ヘッダーの Brain 欄と同じホストへ roslib（`ws://<host>`）で
+rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Connect ROS」）。
 
 ## 画面
 
 | タブ | 役割 |
 |------|------|
-| Drive | バーチャルジョイスティックで `/cmd_vel` を送信。速度上限スライダー・オドメトリ表示・Trail Map 付き |
-| Sensors | IMU (Roll/Pitch/Yaw/Gyro/Accel)・GPS・Camera 映像をリアルタイム表示 |
-| Arm | ESP32 config の `joints` から生成したサーボスライダーで `/servo/command` 送信。Home ボタンで init_angle へ一括復帰 |
-| Face | 表情 ID（`/expression`）・音声発話（`/speech/say`）送信 |
-| Config | ESP32 config の表示・編集。Modes・Servo・Drive(DC)・Encoder・Advanced（ピン/WiFi）を GUI で操作。Advanced はステージ制で一括 POST |
+| Face | 表情 ID（`/expression`）・視線（`/look_at`）・発話（`/speech/say`）を送信。音声認識結果（`/speech/recognized`）を表示 |
+| Sensors | IMU・GPS の表示、カメラ映像のプレビュー（WebRTC） |
+| two wheel mobile robot | バーチャルジョイスティックで `/cmd_vel` を送信。速度上限スライダー・オドメトリ表示・Trail Map 付き |
+| Servo | ESP32 config の `joints` から生成したサーボスライダーで `/servo/command` 送信。Home ボタンで init_angle へ一括復帰 |
+| Vision | 画像処理設定（`/vision/config`：検出方法・色・ArUco・発話・behaviors）、検出結果の表示、カメラ映像のプレビュー |
+| Navigation | rosbridge 接続、`/initialpose` 送信、`navigate_to_pose` アクションのゴール送信、3D 表示（地図・`/scan`・ロボット） |
+| Motion Plan | MoveIt の MotionPlanning パネル相当。rosbridge 接続、計画グループ（`arm` / `gripper`）の選択、目標姿勢（関節スライダー・SRDF の登録姿勢・3D で先端をドラッグして IK）、計画パラメータ、Plan（`/plan_kinematic_path`）→ 軌道のアニメーション表示 → Execute（`/execute_trajectory`）、`/servo/command` への直接送信。ロボットは URDF・メッシュを rosbridge 経由で取得して three.js で描画 |
+| Config | ESP32 config の表示・編集。Modes・Servo・Drive(DC)・Encoder・Lidar・Advanced（ピン/WiFi）を GUI で操作。Advanced はステージ制で一括 POST。REST / WebSocket の接続確認 |
 | Log | brain から受信したメッセージの一覧・フィルタ・手動 JSON 送信 |
 
-Drive / Sensors / Arm の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。
+Sensors / two wheel mobile robot / Servo / Config の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。

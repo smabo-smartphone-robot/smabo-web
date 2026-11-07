@@ -3,7 +3,11 @@ import { brain } from '../ws/brain';
 import { useBrain } from '../store/useBrain';
 import { GazePad } from '../components/GazePad';
 
-export function Face() {
+export type FaceSection = 'speech' | 'gaze' | 'expression' | 'say';
+
+/** `sections` limits which cards are shown (all when omitted); used by layout templates. */
+export function Face({ sections }: { sections?: FaceSection[] } = {}) {
+  const show = (k: FaceSection) => !sections || sections.includes(k);
   const [sayText, setSayText] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [exprId, setExprId] = useState('');
@@ -60,7 +64,7 @@ export function Face() {
     <div className="face-layout">
 
       {/* Recognized speech (app → web) */}
-      <div className="card">
+      {show('speech') && <div className="card">
         <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Recognized speech (from app)</span>
           {recognized.length > 0 && (
@@ -79,10 +83,10 @@ export function Face() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Gaze control (web → app, /look_at) */}
-      <div className="card">
+      {show('gaze') && <div className="card">
         <div className="card-title">Gaze control</div>
         {visionGazeActive ? (
           <div className="expr-hint" style={{ marginBottom: 8 }}>
@@ -95,10 +99,10 @@ export function Face() {
           </div>
         )}
         <GazePad onGaze={(x, y) => sendLookAt(x, y)} disabled={visionGazeActive} />
-      </div>
+      </div>}
 
       {/* Expression */}
-      <div className="card">
+      {show('expression') && <div className="card">
         <div className="card-title">Expression</div>
         <div className="expr-row">
           <span className="expr-hint">Expression ID (number defined in the app)</span>
@@ -113,10 +117,10 @@ export function Face() {
           />
           <button onClick={handleExpression}>Set</button>
         </div>
-      </div>
+      </div>}
 
       {/* Speech / Say */}
-      <div className="card">
+      {show('say') && <div className="card">
         <div className="card-title">Speech / Say</div>
         <div className="say-input-row">
           <input
@@ -137,7 +141,7 @@ export function Face() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
     </div>
   );
