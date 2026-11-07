@@ -14,7 +14,7 @@
  *
  * The brain's web_offer reaches every open smabo-web (rosbridge broadcasts), so
  * each tab sends a random `peer` id with preview / answer / ICE, and only takes an
- * offer addressed to it (brain-ros stamps `peer`; the legacy brain sends offers
+ * offer addressed to it (smabo-brain-ros stamps `peer`; smabo-brain sends offers
  * to one socket only, without `peer`) and only while its preview is on.
  */
 

@@ -5,14 +5,13 @@ type StatusHandler = (s: ConnStatus) => void;
 
 const RECONNECT_DELAY_MS = 3000;
 
-// The brain is either the legacy smabo-brain relay (ws://host/ui), which
-// forwards every topic to the web without being asked, or rosbridge_suite in
-// smabo-brain-ros (ws://host/), where the web must advertise what it publishes
-// and subscribe to what it wants. connect() tries the legacy path first and
-// falls back to rosbridge, then sticks with whichever worked.
-export type BrainProtocol = 'legacy' | 'rosbridge';
+// smabo-brain and smabo-brain-ros (rosbridge_suite) both serve ws://host/ and
+// take the same handshake: advertise what we publish, subscribe to what we
+// read, then publish with the '/web' source prefix. So the web needs no
+// setting for which brain is running. The tables mirror smabo-brain's
+// brain/topics.py (its tests check that they match).
 
-// Canonical topics the web publishes (sent as /web<topic>; brain-ros relays strip it).
+// Canonical topics the web publishes (sent as /web<topic>; the brain strips it).
 const ROSBRIDGE_PUBLISH: Record<string, string> = {
   '/cmd_vel':          'geometry_msgs/msg/Twist',
   '/servo/command':    'trajectory_msgs/msg/JointTrajectory',
@@ -26,7 +25,7 @@ const ROSBRIDGE_PUBLISH: Record<string, string> = {
   '/webrtc/web_ice':   'std_msgs/msg/String',
 };
 
-// Canonical topics the legacy relay pushed to the web unasked (see useBrain).
+// Canonical topics the web reads (handled in store/brainHandlers.ts).
 const ROSBRIDGE_SUBSCRIBE: Record<string, string> = {
   '/odom':               'nav_msgs/msg/Odometry',
   '/pong':               'std_msgs/msg/String',
@@ -47,13 +46,6 @@ class BrainClient {
   private _host = '';
   private _shouldReconnect = false;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private _protocol: BrainProtocol = 'legacy';
-
-  /** Protocol of the current (or last) connection. */
-  get protocol(): BrainProtocol {
-    return this._protocol;
-  }
-
   get isConnected(): boolean {
     return this._status === 'connected';
   }
@@ -70,9 +62,7 @@ class BrainClient {
 
   private _doConnect(): void {
     this._setStatus('connecting');
-    const protocol = this._protocol;
-    const url = protocol === 'legacy' ? `ws://${this._host}/ui` : `ws://${this._host}/`;
-    let opened = false;
+    const url = `ws://${this._host}/`;
 
     try {
       this.ws = new WebSocket(url);
@@ -83,8 +73,7 @@ class BrainClient {
     }
 
     this.ws.onopen = () => {
-      opened = true;
-      if (protocol === 'rosbridge') this._rosbridgeSetup();
+      this._handshake();
       this._setStatus('connected');
     };
 
@@ -103,14 +92,6 @@ class BrainClient {
 
     this.ws.onclose = () => {
       this.ws = null;
-      if (!opened) {
-        // refused (e.g. rosbridge answers /ui with 404): try the other protocol
-        this._protocol = protocol === 'legacy' ? 'rosbridge' : 'legacy';
-        if (protocol === 'legacy' && this._shouldReconnect) {
-          this._doConnect();   // fall back to rosbridge right away
-          return;
-        }
-      }
       if (this._status !== 'error') {
         this._setStatus('disconnected');
       }
@@ -118,8 +99,8 @@ class BrainClient {
     };
   }
 
-  /** rosbridge: announce what we publish and ask for what the legacy relay pushed. */
-  private _rosbridgeSetup(): void {
+  /** Announce what we publish and subscribe to what we read. */
+  private _handshake(): void {
     for (const [topic, type] of Object.entries(ROSBRIDGE_PUBLISH)) {
       this.send({ op: 'advertise', topic: `/web${topic}`, type });
     }
@@ -158,7 +139,7 @@ class BrainClient {
 
   publish(topic: string, msg: unknown): void {
     // 送信元を示す '/web' prefix を付ける。brain が剥がしてから
-    // canonical なトピック名で宛先デバイスに再配信する。
+    // 正式なトピック名で宛先に配信する。
     this.send({ op: 'publish', topic: `/web${topic}`, msg });
   }
 

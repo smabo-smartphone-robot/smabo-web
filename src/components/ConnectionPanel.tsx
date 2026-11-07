@@ -1,7 +1,7 @@
 // Connection status for the setup guides (smabo-web / smabo-app / smabo-esp32):
 // the same checks as the guides' common start-up page, in one place.
 import { useBrain } from '../store/useBrain';
-import { Esp32CommCheck } from '../tabs/Config';
+import { Esp32CommCheck } from '../tabs/config/Esp32CommCheck';
 
 type Part = 'brain' | 'app' | 'esp32';
 

@@ -47,7 +47,7 @@ python -m http.server --directory dist
 
 | 入力欄 | 接続先 | プロトコル |
 |--------|--------|------------|
-| Brain host:port | smabo-brain / smabo-brain-ros | `ws://<host>/ui` |
+| Brain host:port | smabo-brain / smabo-brain-ros | `ws://<host>/`（どちらの brain でも同じ） |
 | ESP32 host (REST) | smabo-esp32 | `http://<host>/config`, `/mode` |
 
 - **Brain** 欄を入力して「Connect」（または Enter）→ WebSocket 接続

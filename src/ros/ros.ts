@@ -1,7 +1,8 @@
 // roslibjs connection to rosbridge_suite (smabo-brain-ros) for the ROS-native
 // features: Nav2 (initialpose / navigate_to_pose / map / scan / plan) and
-// MoveIt2 (joint states / move_action). The legacy telemetry tabs keep using
-// ws/brain.ts; both target the same rosbridge endpoint (default :9090).
+// MoveIt2 (joint states / move_action). These only exist with smabo-brain-ros.
+// The other panels use ws/brain.ts, which works with either brain; both
+// connect to the same endpoint (default :9090).
 //
 // Web publishes with the '/web' source prefix (e.g. /web/initialpose) — the
 // smabo-brain-ros relay nodes strip it to the canonical topic. Subscriptions
