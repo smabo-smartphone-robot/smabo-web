@@ -22,6 +22,9 @@ export const ImprovErrorCode = {
 } as const;
 
 const CMD_WIFI_SETTINGS = 1;
+/** smabo's own command (outside Improv's range): where the brain is, and an
+ *  invite code, so the ESP32 pairs with the brain once it is on Wi-Fi. */
+const CMD_BRAIN_INVITE = 0xf0;
 
 export function checksum(bytes: Uint8Array): number {
   let sum = 0;
@@ -40,6 +43,23 @@ export function wifiSettingsPacket(ssid: string, password: string): Uint8Array<A
   const data = [s.length, ...s, p.length, ...p];
   const body = new Uint8Array([CMD_WIFI_SETTINGS, data.length, ...data]);
   return new Uint8Array([...body, checksum(body)]);
+}
+
+function packet(command: number, strings: string[]): Uint8Array<ArrayBuffer> {
+  const enc = new TextEncoder();
+  const data: number[] = [];
+  for (const s of strings) {
+    const b = enc.encode(s);
+    if (b.length > 255) throw new Error('Text is too long');
+    data.push(b.length, ...b);
+  }
+  const body = new Uint8Array([command, data.length, ...data]);
+  return new Uint8Array([...body, checksum(body)]);
+}
+
+/** smabo's invite packet: [0xF0, len, hostLen, "host:port", codeLen, code, checksum]. */
+export function brainInvitePacket(brainHost: string, code: string): Uint8Array<ArrayBuffer> {
+  return packet(CMD_BRAIN_INVITE, [brainHost, code]);
 }
 
 /** Strings in an RPC result packet, or null when the packet is malformed. */
@@ -136,6 +156,35 @@ export class ImprovDevice {
       error.addEventListener('characteristicvaluechanged', onError);
       result.addEventListener('characteristicvaluechanged', onResult);
       rpc.writeValueWithResponse(packet).catch(fail);
+    });
+  }
+
+  /** Tell the ESP32 where the brain is and give it an invite (before the Wi-Fi
+   *  settings). False when its firmware does not know the command. */
+  async sendBrainInvite(brainHost: string, code: string): Promise<boolean> {
+    const { error, result, rpc } = this.chars;
+    await Promise.all([error.startNotifications(), result.startNotifications()]);
+    return new Promise<boolean>((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        error.removeEventListener('characteristicvaluechanged', onError);
+        result.removeEventListener('characteristicvaluechanged', onResult);
+      };
+      const onError = (ev: Event) => {
+        const code = (ev.target as BluetoothRemoteGATTCharacteristic).value!.getUint8(0);
+        if (code === ImprovErrorCode.None) return;
+        cleanup();
+        if (code === ImprovErrorCode.UnknownRpc) resolve(false); else reject(new Error(errorText(code)));
+      };
+      const onResult = (ev: Event) => {
+        const v = (ev.target as BluetoothRemoteGATTCharacteristic).value!;
+        const parsed = parseRpcResult(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+        if (parsed?.command === CMD_BRAIN_INVITE) { cleanup(); resolve(true); }
+      };
+      const timer = setTimeout(() => { cleanup(); resolve(false); }, 5000);
+      error.addEventListener('characteristicvaluechanged', onError);
+      result.addEventListener('characteristicvaluechanged', onResult);
+      rpc.writeValueWithResponse(brainInvitePacket(brainHost, code)).catch(e => { cleanup(); reject(e); });
     });
   }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { brain } from '../ws/brain';
+import { brain, type BrainAuth, type BrainRefusal } from '../ws/brain';
+import { browserName } from '../ws/auth';
 import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
 import type { ConnStatus, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
@@ -58,8 +59,13 @@ export interface BrainStore {
 
   // Protocol check (/brain/info and the brain's hello notices): who speaks a
   // different protocol number than this smabo-web, keyed by 'brain' / 'app' / 'esp32'.
-  brainInfo: { brain: string; version: string; protocol: number } | null;
+  brainInfo: { brain: string; version: string; protocol: number; auth: boolean } | null;
   protocolWarnings: Record<string, string>;
+
+  // Pairing with the brain: who it says we are, or why it refused us
+  // (status 'unpaired' shows the pairing screen).
+  brainAuth: BrainAuth | null;
+  brainRefusal: BrainRefusal | null;
 
   // ESP32 通信確認
   esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果（web↔ESP32）
@@ -96,6 +102,10 @@ export interface BrainStore {
   removeConfig(patch: Record<string, unknown>): void;
   setServoEnabled(name: string, enabled: boolean): void;
   setMode(modes: Record<string, unknown>): void;
+  /** Pair this browser with a code from the brain's log or an invite. */
+  pairBrowser(code: string, name?: string): void;
+  /** Forget this browser's token for the current brain. */
+  unpairBrowser(): void;
 }
 
 export const useBrain = create<BrainStore>((set, get) => {
@@ -143,6 +153,8 @@ export const useBrain = create<BrainStore>((set, get) => {
     esp32Connected: null,
     brainInfo: null,
     protocolWarnings: {},
+    brainAuth: null,
+    brainRefusal: null,
 
     esp32Ping: null,
     esp32WsPing: null,
@@ -322,6 +334,16 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.setConfig(patch)
         .then(() => get().refreshConfig())
         .catch(() => get().addToast('Failed to update servo', 'err'));
+    },
+
+    pairBrowser: (code, name) => {
+      brain.pair(get().host, code, name || browserName());
+    },
+
+    unpairBrowser: () => {
+      brain.forget();
+      brain.disconnect();
+      set({ brainAuth: null });
     },
 
     setMode: (modes) => {

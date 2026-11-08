@@ -1608,3 +1608,43 @@ details[open] > summary::before {
 .improv-msg { font-size: .78rem; }
 .improv-msg.err { color: var(--accent); }
 .improv-msg.ok { color: var(--green); }
+
+/* Pairing with the brain */
+.pairing-screen { display: grid; place-items: start center; padding: 48px 16px; min-height: calc(100dvh - 60px); }
+.pairing-card { width: 100%; max-width: 460px; display: grid; gap: 12px; }
+.pairing-title { font-size: 1.15rem; font-weight: 600; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+.pairing-lead { margin: 0; color: var(--dim); }
+.pairing-steps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: .82rem; color: var(--dim); }
+.pairing-steps code, .pairing-note code { font-size: .78rem; }
+.pairing-field { display: grid; gap: 4px; font-size: .78rem; }
+.pairing-field input { font-size: 1rem; letter-spacing: .04em; }
+.pairing-error { color: var(--accent); font-size: .82rem; }
+.pairing-note { margin: 0; font-size: .74rem; color: var(--dim); }
+
+.devices-card { display: grid; gap: 10px; }
+.devices-error { color: var(--accent); font-size: .78rem; }
+.devices-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.devices-row { display: grid; grid-template-columns: auto 64px 1fr auto auto; gap: 8px; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
+.devices-role { color: var(--dim); font-size: .74rem; }
+.devices-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devices-you { margin-left: 8px; font-size: .68rem; color: var(--primary); }
+.devices-seen { color: var(--dim); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.devices-actions, .devices-rename { display: flex; gap: 4px; }
+.devices-actions button, .devices-rename button, .devices-add button { font-size: .72rem; padding: 2px 10px; }
+.devices-rename { grid-column: 3 / -1; }
+.devices-rename input { min-width: 0; flex: 1; }
+.devices-add { display: flex; gap: 6px; align-items: center; font-size: .78rem; color: var(--dim); }
+.invite-box { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.invite-head { display: flex; justify-content: space-between; font-size: .78rem; color: var(--dim); }
+.invite-head .link { background: none; border: none; padding: 0; color: var(--primary); font-size: .74rem; }
+.invite-code { font: 600 1.6rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; }
+.invite-code.expired { opacity: .4; text-decoration: line-through; }
+.invite-ttl, .invite-how { margin: 0; font-size: .76rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+.invite-send { display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap; }
+.invite-send label { display: grid; gap: 4px; flex: 1; min-width: 220px; font-size: .74rem; color: var(--dim); }
+@media (max-width: 520px) {
+  .devices-row { grid-template-columns: auto 1fr auto; }
+  .devices-role { display: none; }
+  .devices-actions { grid-column: 2 / -1; }
+}

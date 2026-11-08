@@ -11,7 +11,7 @@ import type { Capability } from './capabilities';
 
 export type PanelId =
   | 'face' | 'sensors' | 'drive' | 'servo' | 'vision' | 'nav' | 'plan'
-  | 'config' | 'log' | 'connection' | 'tabs'
+  | 'config' | 'log' | 'connection' | 'devices' | 'tabs'
   | 'empty';                    // a new pane waiting for the user to pick a panel
 
 export interface PanelLeaf {

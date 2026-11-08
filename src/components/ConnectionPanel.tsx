@@ -3,6 +3,7 @@
 import { useBrain } from '../store/useBrain';
 import { Esp32CommCheck } from '../tabs/config/Esp32CommCheck';
 import { ImprovWifiSetup } from '../tabs/config/ImprovWifiSetup';
+import { DevicesCard } from './DevicesCard';
 
 type Part = 'brain' | 'app' | 'esp32';
 
@@ -52,6 +53,7 @@ export function ConnectionPanel({ parts = ['brain', 'app', 'esp32'], next }: { p
       )}
       {parts.includes('esp32') && <Esp32CommCheck />}
       {parts.includes('esp32') && <ImprovWifiSetup />}
+      <DevicesCard />
       {next && (
         <div className="card conn-next">
           <div className="card-title">Next</div>

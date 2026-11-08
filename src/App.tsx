@@ -3,6 +3,7 @@ import { useBrain } from './store/useBrain';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { TemplatePicker } from './components/TemplatePicker';
+import { PairingScreen } from './components/PairingScreen';
 import { SplitLayout } from './layout/SplitLayout';
 import { useTemplate, useTree } from './layout/useLayout';
 
@@ -11,6 +12,7 @@ export default function App() {
   const refreshConfigQuietly = useBrain(s => s.refreshConfigQuietly);
   const template = useTemplate();
   const tree = useTree();
+  const unpaired = useBrain(s => s.status === 'unpaired');
 
   useEffect(() => {
     autoConnect();
@@ -22,7 +24,7 @@ export default function App() {
     <>
       <Header />
       {/* key: a new template remounts its panels instead of reusing another template's */}
-      <SplitLayout key={template.id} layout={tree} />
+      {unpaired ? <PairingScreen /> : <SplitLayout key={template.id} layout={tree} />}
       <TemplatePicker />
       <Toast />
     </>

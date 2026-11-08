@@ -1,11 +1,19 @@
 import type { ConnStatus, RosbridgeMsg } from './types';
 import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
 import { PUBLISH, SUBSCRIBE } from './protocol.gen';
+import { clearToken, loadToken, saveToken } from './auth';
 
 type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
 
 const RECONNECT_DELAY_MS = 3000;
+// A brain with --no-auth (and smabo-brain-ros) does not answer the token
+const AUTH_REPLY_TIMEOUT_MS = 1500;
+
+/** Who the brain says we are, after it accepted our token. */
+export interface BrainAuth { role: string; name: string; id: string }
+/** Why the brain refused us (shown on the pairing screen). */
+export interface BrainRefusal { reason: string; message: string }
 
 // smabo-brain and smabo-brain-ros (rosbridge_suite) both serve ws://host/ and
 // take the same handshake: advertise what we publish, subscribe to what we
@@ -15,6 +23,10 @@ const RECONNECT_DELAY_MS = 3000;
 const ROSBRIDGE_PUBLISH = PUBLISH;
 const ROSBRIDGE_SUBSCRIBE = SUBSCRIBE;
 
+// Pairing (smabo-brain): the first frame is our token ({op:'auth'}, empty
+// without one) or a code ({op:'pair'}); the brain answers with the same op.
+// Refused → status 'unpaired' and the pairing screen, without a retry loop.
+
 class BrainClient {
   private ws: WebSocket | null = null;
   private msgHandlers = new Set<MsgHandler>();
@@ -23,6 +35,17 @@ class BrainClient {
   private _host = '';
   private _shouldReconnect = false;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _authTimer: ReturnType<typeof setTimeout> | null = null;
+  private _pendingPair: { code: string; name: string } | null = null;
+  private _ready = false;
+  /** Set once the brain accepted our token; null with a brain that has no pairing. */
+  auth: BrainAuth | null = null;
+  refusal: BrainRefusal | null = null;
+
+  get host(): string { return this._host; }
+  /** This browser's token for the current brain (Bearer for the brain's HTTP API). */
+  get token(): string | null { return this._host ? loadToken(this._host) : null; }
+
   get isConnected(): boolean {
     return this._status === 'connected';
   }
@@ -49,18 +72,33 @@ class BrainClient {
       return;
     }
 
+    this._ready = false;
     this.ws.onopen = () => {
-      this._handshake();
-      this._setStatus('connected');
+      const pair = this._pendingPair;
+      const token = loadToken(this._host);
+      // Always ask first, even without a token: a brain with pairing refuses at
+      // once (pairing screen), smabo-brain --no-auth accepts, and one that does
+      // not know auth (smabo-brain-ros) says nothing until the timeout.
+      if (pair) {
+        this.send({ op: 'pair', code: pair.code, name: pair.name, role: 'web' });
+      } else {
+        this.send({ op: 'auth', token: token ?? '' });
+      }
+      this._authTimer = setTimeout(() => this._onReady(), AUTH_REPLY_TIMEOUT_MS);
     };
 
     this.ws.onmessage = (ev: MessageEvent) => {
+      let msg: RosbridgeMsg;
       try {
-        const msg = JSON.parse(ev.data as string) as RosbridgeMsg;
-        this.msgHandlers.forEach(h => h(msg));
+        msg = JSON.parse(ev.data as string) as RosbridgeMsg;
       } catch {
-        // ignore parse errors
+        return;
       }
+      if (msg.op === 'auth' || msg.op === 'pair') {
+        this._onAuthReply(msg as unknown as Record<string, unknown>);
+        return;
+      }
+      this.msgHandlers.forEach(h => h(msg));
     };
 
     this.ws.onerror = () => {
@@ -69,11 +107,61 @@ class BrainClient {
 
     this.ws.onclose = () => {
       this.ws = null;
+      this._clearAuthTimer();
+      if (this._status === 'unpaired') return;   // wait for a code; no retry loop
       if (this._status !== 'error') {
         this._setStatus('disconnected');
       }
       this._scheduleReconnect();
     };
+  }
+
+  private _clearAuthTimer(): void {
+    if (this._authTimer) { clearTimeout(this._authTimer); this._authTimer = null; }
+  }
+
+  /** The brain accepted us (or did not ask): handshake and show as connected. */
+  private _onReady(): void {
+    this._clearAuthTimer();
+    if (this._ready) return;
+    this._ready = true;
+    this._handshake();
+    this._setStatus('connected');
+  }
+
+  private _onAuthReply(m: Record<string, unknown>): void {
+    this._clearAuthTimer();
+    const host = this._host;
+    if (m['ok'] === true) {
+      if (m['op'] === 'pair' && typeof m['token'] === 'string') saveToken(host, m['token']);
+      this._pendingPair = null;
+      this.refusal = null;
+      this.auth = { role: String(m['role'] ?? ''), name: String(m['name'] ?? ''), id: String(m['id'] ?? '') };
+      this._onReady();
+      return;
+    }
+    const reason = String(m['reason'] ?? 'unauthorized');
+    if (m['op'] === 'auth' && reason === 'unauthorized') clearToken(host);   // the brain forgot us
+    this._pendingPair = null;
+    this.auth = null;
+    this.refusal = { reason, message: String(m['message'] ?? '') };
+    this._shouldReconnect = false;
+    this._ready = false;
+    this._setStatus('unpaired');
+  }
+
+  /** Pair with a code from the brain's log or from an already paired browser. */
+  pair(host: string, code: string, name: string): void {
+    this._pendingPair = { code, name };
+    this.refusal = null;
+    this._shouldReconnect = false;   // let connect() start afresh
+    this.connect(host);
+  }
+
+  /** Forget this browser's token for the current brain (it must pair again). */
+  forget(): void {
+    if (this._host) clearToken(this._host);
+    this.auth = null;
   }
 
   /** Announce what we publish, subscribe to what we read, then say which
@@ -100,6 +188,7 @@ class BrainClient {
 
   disconnect(): void {
     this._shouldReconnect = false;
+    this._clearAuthTimer();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;

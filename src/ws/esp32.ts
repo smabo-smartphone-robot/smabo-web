@@ -1,4 +1,8 @@
-// 設定の REST クライアント。brain を介さず、機器の HTTP API を直接叩く。
+// 設定の REST クライアント。
+// brain がペアリングを使うとき（/brain/info の auth: true）は、brain の
+// /devices/esp32/…・/devices/app/… に Bearer token 付きで送り、brain が機器へ転送する
+// （setGateway）。ペアリング済みの機器は brain 以外からの要求を断る。
+// --no-auth の brain では、従来どおり機器の HTTP API を直接叩く。
 //   ESP32（port 80）:
 //     GET  /config          → 全 config
 //     POST /config {patch}  → config パッチ適用（ピン変更時は ESP32 再起動）
@@ -10,17 +14,42 @@
 
 type ConfigObj = Record<string, unknown>;
 
+/** Send through the brain: its /devices/<role> base URL and our token. */
+export interface Gateway { base: string; token: string | null }
+
+/** The device's error text ({error, message} from the device or the brain's relay). */
+async function failure(r: Response, what: string): Promise<Error> {
+  const j = await r.json().catch(() => ({})) as { error?: string; message?: string };
+  return new Error(j.message || j.error || `${what} ${r.status}`);
+}
+
 class ConfigClient {
   constructor(private readonly name: string) {}
 
   private host = '';
+  private gateway: Gateway | null = null;
 
   setHost(h: string): void {
     this.host = h;
   }
 
+  setGateway(g: Gateway | null): void {
+    this.gateway = g;
+  }
+
+  get viaBrain(): boolean {
+    return this.gateway !== null;
+  }
+
+  private headers(json = false): Record<string, string> {
+    const h: Record<string, string> = json ? { 'Content-Type': 'application/json' } : {};
+    if (this.gateway?.token) h['Authorization'] = `Bearer ${this.gateway.token}`;
+    return h;
+  }
+
   /** host を正規化したベース URL（"ip" / "ip:port" / "http://ip" を許容） */
   private base(): string {
+    if (this.gateway) return this.gateway.base.replace(/\/+$/, '');
     let h = this.host.trim();
     if (!h) throw new Error(`${this.name} host not set`);
     if (!/^https?:\/\//.test(h)) h = `http://${h}`;
@@ -28,16 +57,16 @@ class ConfigClient {
   }
 
   async getConfig(): Promise<ConfigObj> {
-    const r = await fetch(`${this.base()}/config`);
-    if (!r.ok) throw new Error(`GET /config ${r.status}`);
+    const r = await fetch(`${this.base()}/config`, { headers: this.headers() });
+    if (!r.ok) throw await failure(r, 'GET /config');
     return r.json() as Promise<ConfigObj>;
   }
 
   /** GET /config への到達性を確認し、往復時間 (ms) を返す。到達不可なら throw。 */
   async ping(): Promise<number> {
     const t0 = performance.now();
-    const r = await fetch(`${this.base()}/config`, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`GET /config ${r.status}`);
+    const r = await fetch(`${this.base()}/config`, { cache: 'no-store', headers: this.headers() });
+    if (!r.ok) throw await failure(r, 'GET /config');
     return Math.round(performance.now() - t0);
   }
 
@@ -45,10 +74,10 @@ class ConfigClient {
   async setConfig(patch: ConfigObj): Promise<string[]> {
     const r = await fetch(`${this.base()}/config`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers(true),
       body: JSON.stringify(patch),
     });
-    if (!r.ok) throw new Error(`POST /config ${r.status}`);
+    if (!r.ok) throw await failure(r, 'POST /config');
     const body = await r.json().catch(() => ({})) as { ignored?: unknown };
     return Array.isArray(body.ignored) ? body.ignored.map(String) : [];
   }
@@ -58,25 +87,35 @@ class ConfigClient {
     try { return `${this.base()}${path}`; } catch { return ''; }
   }
 
+  /** A URL an <img> can show. Through the brain the request needs our token,
+   *  so the image is fetched here and handed over as a blob: URL (revoke it). */
+  async imageUrl(path: string): Promise<string> {
+    if (!this.gateway) return this.url(path);
+    const r = await fetch(`${this.base()}${path}`, { cache: 'no-store', headers: this.headers() });
+    if (!r.ok) throw await failure(r, `GET ${path}`);
+    return URL.createObjectURL(await r.blob());
+  }
+
   /** Any JSON endpoint on the device (the phone's /face/...). Throws with the device's error message. */
   async request<T = unknown>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
     const r = await fetch(`${this.base()}${path}`, {
       method,
       cache: 'no-store',
-      ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+      headers: this.headers(body !== undefined),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
-    const j = await r.json().catch(() => ({})) as { error?: string };
-    if (!r.ok) throw new Error(j.error || `${method} ${path} ${r.status}`);
+    const j = await r.json().catch(() => ({})) as { error?: string; message?: string };
+    if (!r.ok) throw new Error(j.message || j.error || `${method} ${path} ${r.status}`);
     return j as T;
   }
 
   async setMode(modes: ConfigObj): Promise<void> {
     const r = await fetch(`${this.base()}/mode`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers(true),
       body: JSON.stringify(modes),
     });
-    if (!r.ok) throw new Error(`POST /mode ${r.status}`);
+    if (!r.ok) throw await failure(r, 'POST /mode');
   }
 }
 

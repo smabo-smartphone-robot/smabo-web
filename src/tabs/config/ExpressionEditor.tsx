@@ -118,6 +118,7 @@ export function ExpressionEditor() {
   const [showOnPhone, setShowOnPhone] = useState(true);
   const [rev, setRev] = useState(0);          // bumped when the preview should be re-fetched
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState('');
   const lastEdit = useRef(0);
   const pending = useRef<{ id: number; patch: Obj } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,12 +202,29 @@ export function ExpressionEditor() {
       .catch(e => addToast(`Could not delete: ${e.message}`, 'err'));
   };
 
+  // Through the brain the preview needs our token: fetch it as a blob URL.
+  const previewId = selected !== null && exprs.some(e => e.id === selected) ? selected : null;
+  useEffect(() => {
+    if (!host || previewId === null) { setPreviewSrc(''); return; }
+    let url = '';
+    let live = true;
+    phone.imageUrl(`/face/preview.png?id=${previewId}&w=${PREVIEW_W * 2}&h=${PREVIEW_H * 2}&v=${rev}`)
+      .then(u => {
+        url = u;
+        if (live) setPreviewSrc(u); else if (u.startsWith('blob:')) URL.revokeObjectURL(u);
+      })
+      .catch(() => { if (live) setPreviewFailed(true); });
+    return () => {
+      live = false;
+      if (url.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(url), 1000);   // after the next image loaded
+    };
+  }, [host, previewId, rev]);
+
   if (!host) return null;
   if (!schema) {
     return <div className="expr-hint">This phone has no expression API (update smabo-app).</div>;
   }
   const x = exprs.find(e => e.id === selected);
-  const previewSrc = x ? phone.url(`/face/preview.png?id=${x.id}&w=${PREVIEW_W * 2}&h=${PREVIEW_H * 2}&v=${rev}`) : '';
   const eyesShown = x ? (x['per_eye'] === true ? schema.eyes : schema.eyes.slice(0, 1)) : [];
 
   // Layout (index.css .expr-*): the expression list, actions and preview on
@@ -235,7 +253,7 @@ export function ExpressionEditor() {
           {x && (previewFailed ? (
             <div className="expr-hint">No preview from this phone (update smabo-app).</div>
           ) : (
-            <img className="expr-preview" src={previewSrc} alt={`Expression "${x.name}" as drawn on the phone`}
+            <img className="expr-preview" src={previewSrc || undefined} alt={`Expression "${x.name}" as drawn on the phone`}
               width={PREVIEW_W} height={PREVIEW_H} onError={() => setPreviewFailed(true)}
               onLoad={() => setPreviewFailed(false)} />
           ))}

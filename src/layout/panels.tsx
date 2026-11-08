@@ -14,6 +14,7 @@ import { Plan } from '../tabs/Plan';
 import { Config } from '../tabs/Config';
 import { Log } from '../tabs/Log';
 import { ConnectionPanel } from '../components/ConnectionPanel';
+import { DevicesCard } from '../components/DevicesCard';
 import { ClassicTabs } from './ClassicTabs';
 import type { PanelId, PanelLeaf } from './types';
 
@@ -36,6 +37,7 @@ export const PANELS: Record<PanelId, PanelDef> = {
   config:     { title: 'Config',            component: Config },
   log:        { title: 'Log',               component: Log, narrowMinHeight: 320 },
   connection: { title: 'Connection',        component: ConnectionPanel },
+  devices:    { title: 'Devices',           component: DevicesCard },
   tabs:       { title: 'All tabs',          component: ClassicTabs, flush: true },
   empty:      { title: 'New panel',         component: () => null },   // SplitLayout shows the chooser
 };
@@ -58,6 +60,7 @@ export const PANEL_PRESETS: { group: string; leaf: PanelLeaf }[] = [
   { group: 'Robot', leaf: { panel: 'servo' } },
   { group: 'Robot', leaf: { panel: 'config' } },
   { group: 'Robot', leaf: { panel: 'connection' } },
+  { group: 'Robot', leaf: { panel: 'devices' } },
   { group: 'Processing', leaf: { panel: 'vision' } },
   { group: 'Processing', leaf: { panel: 'nav' } },
   { group: 'Processing', leaf: { panel: 'plan' } },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checksum, errorText, ImprovErrorCode, parseRpcResult, wifiSettingsPacket } from './improv';
+import { brainInvitePacket, checksum, errorText, ImprovErrorCode, parseRpcResult, wifiSettingsPacket } from './improv';
 
 describe('Improv packets', () => {
   it('builds the Wi-Fi settings packet', () => {
@@ -31,6 +31,14 @@ describe('Improv packets', () => {
     expect(parseRpcResult(new Uint8Array([1, 0]))).toBeNull();
     expect(parseRpcResult(new Uint8Array([1, 0, 0]))).toBeNull();          // bad checksum
     expect(parseRpcResult(new Uint8Array([1, 2, 5, 0, 8]))).toBeNull();    // string past the end
+  });
+
+  it('builds smabo\'s brain invite packet', () => {
+    const p = brainInvitePacket('10.0.0.2:9090', 'ABCD-EFGH');
+    expect(p[0]).toBe(0xf0);
+    expect(p[1]).toBe(1 + 13 + 1 + 9);
+    expect(new TextDecoder().decode(p.subarray(3, 16))).toBe('10.0.0.2:9090');
+    expect(p[p.length - 1]).toBe(checksum(p.subarray(0, -1)));
   });
 
   it('explains connection failures', () => {

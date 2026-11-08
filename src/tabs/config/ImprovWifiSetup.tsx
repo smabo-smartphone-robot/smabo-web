@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ImprovDevice, State, bluetoothAvailable } from '../../ble/improv';
 import { useBrain } from '../../store/useBrain';
+import { createInvite } from '../../ws/brainApi';
 
 // ── Wi-Fi setup over Bluetooth (Improv) ───────────────────────
 // For an ESP32 that cannot join Wi-Fi: it advertises over Bluetooth until it
@@ -11,6 +12,8 @@ export function ImprovWifiSetup() {
   const setEsp32Host = useBrain(s => s.setEsp32Host);
   const refreshConfig = useBrain(s => s.refreshConfig);
   const addToast = useBrain(s => s.addToast);
+  const brainHost = useBrain(s => s.host);
+  const pairing = useBrain(s => s.status === 'connected' && s.brainInfo?.auth === true);
 
   const [device, setDevice] = useState<ImprovDevice | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -41,6 +44,14 @@ export function ImprovWifiSetup() {
     setPhase('sending');
     setMessage('Sending… the ESP32 is joining the network (up to 20 s)');
     try {
+      // A brain with pairing: the ESP32 also gets the brain's address and an
+      // invite, and pairs by itself once it is on Wi-Fi.
+      if (pairing) {
+        const invite = await createInvite('esp32');
+        if (!await device.sendBrainInvite(brainHost, invite.code)) {
+          addToast('This ESP32 firmware cannot pair over Bluetooth; add it from Devices after Wi-Fi is set', 'err');
+        }
+      }
       const url = await device.provision(ssid, password, s => {
         if (s === State.Provisioning) setMessage('The ESP32 is joining the network…');
       });

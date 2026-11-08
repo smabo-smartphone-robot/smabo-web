@@ -2,6 +2,7 @@
 // Registered once by the useBrain store; updates the store via set / get.
 import type { StoreApi } from 'zustand';
 import { brain } from '../ws/brain';
+import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
 import type {
   ConnStatus, Detection2DArrayMsg, GpsMsg, ImuMsg, OdomMsg, RosbridgeMsg, StringMsg, VisionConfigMsg,
@@ -149,8 +150,19 @@ export function registerBrainHandlers(set: Set, get: Get): void {
             brain: String(info['brain'] ?? 'brain'),
             version: String(info['version'] ?? '?'),
             protocol: info['protocol'],
+            auth: info['auth'] === true,
           };
+          const switched = (get().brainInfo?.auth ?? false) !== brainInfo.auth || !get().brainInfo;
           set({ brainInfo });
+          // A brain with pairing relays the devices' settings (/devices/...);
+          // without it the web talks to the devices directly.
+          const base = `http://${brain.host}/devices`;
+          esp32.setGateway(brainInfo.auth ? { base: `${base}/esp32`, token: brain.token } : null);
+          phone.setGateway(brainInfo.auth ? { base: `${base}/app`, token: brain.token } : null);
+          if (switched && brainInfo.auth) {
+            get().refreshConfigQuietly();
+            if (get().phoneHost) get().refreshPhoneConfig();
+          }
           setProtocolWarning('brain', brainInfo.protocol === PROTOCOL_VERSION ? null
             : `${brainInfo.brain} ${brainInfo.version} speaks protocol ${brainInfo.protocol}; `
               + `this smabo-web ${WEB_VERSION} speaks ${PROTOCOL_VERSION}. Update the older one.`);
@@ -175,6 +187,10 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       return;
     }
     const source = String(n['source']);
+    if (n['event'] === 'paired') {
+      get().addToast(`Paired ${String(n['name'] ?? source)}`, 'ok');
+      return;
+    }
     if (n['event'] === 'hello') {
       // smabo-brain checked an app / ESP32's protocol number against its own
       setProtocolWarning(source, n['ok'] !== false ? null
@@ -232,7 +248,7 @@ export function registerBrainHandlers(set: Set, get: Get): void {
   // ── connection status ────────────────────────────────────────
   let wasConnected = false;
   brain.onStatus((s: ConnStatus) => {
-    set({ status: s });
+    set({ status: s, brainAuth: brain.auth, brainRefusal: brain.refusal });
     if (s === 'connected') {
       wasConnected = true;
       get().addLog({ type: 'info', text: 'Brain connected' });
@@ -244,6 +260,10 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       // Brain が切れたら ESP32 状態も不明に戻す。再接続時のスナップショットで確定する。
       cancelEsp32Disconnect();
       set({ previewOn: false, webrtcStream: null, esp32Connected: null, brainInfo: null, protocolWarnings: {} });
+    } else if (s === 'unpaired') {
+      get().addLog({ type: 'info', text: `Brain needs pairing (${brain.refusal?.reason ?? 'unauthorized'})` });
+      wasConnected = false;
+      set({ esp32Connected: null, brainInfo: null, protocolWarnings: {} });
     } else if (s === 'error') {
       if (wasConnected) get().addToast('Connection error', 'err');
     }

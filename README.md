@@ -79,6 +79,19 @@ rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Co
 
 Sensors / two wheel mobile robot / Servo / Config の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。
 
+## brain とのペアリング
+
+smabo-brain はペアリングしたブラウザだけを受け付けます。初めてつなぐと「Pair this browser with the brain」の画面になるので、次のコードを入力します。
+
+- **最初のブラウザ**: brain のログに出るコード（`最初のブラウザ用のペアリングコード: ABCD-EFGH`）
+- **2 台目以降**: ペアリング済みのブラウザの「Devices」→「Add Browser」で出るコード
+
+token はブラウザの localStorage に brain のアドレスごとに保存され、接続のたびに最初のフレームで brain に見せます（`src/ws/auth.ts`・`src/ws/brain.ts`）。brain に断られると、再接続を繰り返さずにペアリングの画面に戻ります。
+
+「Devices」パネル（`src/components/DevicesCard.tsx`。接続パネルにもあります）で、ペアリング済みのブラウザ・スマホ・ESP32 の一覧、名前の変更、取り外し、招待コードの発行ができます。スマホは smabo-app の設定でコードを入力し、ESP32 は Bluetooth の Wi-Fi 設定で自動的に受け取ります。ネットワークにいるがペアリング前の機器には、招待ボックスからアドレスを指定して直接送れます。
+
+ペアリングを使う brain では、ESP32 とスマホの設定は brain の `/devices/esp32/…`・`/devices/app/…` を通ります（`src/ws/esp32.ts` の `setGateway`）。ペアリング済みの機器は brain 以外からの要求を断ります。`--no-auth` の brain と smabo-brain-ros では、今までどおり機器へ直接つなぎます。
+
 ## ESP32 の Wi-Fi を Bluetooth で設定する
 
 ESP32 が Wi-Fi につながらないとき、設定パネル（ESP32 の設定が読めないとき）と smabo-esp32 テンプレートの「ESP32 Wi-Fi setup over Bluetooth」から、SSID とパスワードを Bluetooth で送れます（Improv Wi-Fi、`src/ble/improv.ts`）。Web Bluetooth は Chrome / Edge で、ページを `https://` か `http://localhost` で開いたときだけ使えます。LAN のアドレス（`http://192.168.x.x:5173`）で開いた画面ではボタンが押せないので、ESP32 の近くの PC で `localhost` を開いてください。
