@@ -34,6 +34,11 @@ npm install
 
 `npm run build` で生成された `dist/` を任意の静的ホスティングに置くだけです。
 
+> **HTTP で配信してください。** smabo-web は brain（`ws://`）と ESP32・スマホの設定 API
+> （`http://`）に直接つなぎます。HTTPS のページからは、ブラウザがこれらの接続を止めるため動きません
+> （GitHub Pages などの HTTPS ホスティングも同じです）。brain が唯一の窓口になれば、brain から
+> smabo-web を配信して HTTPS にできるようになる予定です。
+
 ```bash
 # 手元で確認する場合
 npm run preview
@@ -73,3 +78,8 @@ rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Co
 | Log | brain から受信したメッセージの一覧・フィルタ・手動 JSON 送信 |
 
 Sensors / two wheel mobile robot / Servo / Config の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。
+
+## バージョンと互換性
+
+ほかの smabo リポジトリとは、同じ minor 番号（`0.2.x` など）どうしで組み合わせます。対応表は
+[smabo-brain の README](https://github.com/smabo-smartphone-robot/smabo-brain#バージョンと互換性) にあります。
