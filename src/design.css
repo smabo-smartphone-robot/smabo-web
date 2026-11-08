@@ -190,7 +190,7 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 /* ---------- workspace: panes ---------- */
 .layout-root { padding: 10px; }
 
-.split-divider { flex-basis: 10px; position: relative; background: transparent; border-radius: 0; }
+.split-divider { background: transparent; border-radius: 0; }
 .split-divider::after {
   content: "";
   position: absolute;
@@ -199,14 +199,10 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
   opacity: 0;
   transition: opacity .18s, background .18s;
 }
-.split--row > .split-divider::after { top: 50%; left: 50%; width: 3px; height: 36px; transform: translate(-50%, -50%); }
-.split--column > .split-divider::after { top: 50%; left: 50%; height: 3px; width: 36px; transform: translate(-50%, -50%); }
 .split-divider:hover,
-.split-divider:focus-visible,
-.split--dragging > .split-divider { background: transparent; }
+.split-divider:focus-visible { background: transparent; }
 .split-divider:hover::after,
 .split-divider:focus-visible::after { opacity: 1; }
-.split--dragging > .split-divider::after { opacity: 1; background: var(--primary); }
 
 .pane {
   background: var(--bg2);
@@ -382,12 +378,6 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 .panel-chooser-items button { border-radius: 99px; padding: 5px 12px; }
 .panel-chooser-items button:hover { border-color: var(--primary); color: var(--text); }
 
-.pane-drop-hint {
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  border: 1.5px dashed var(--primary);
-  border-radius: 12px;
-}
-.pane-drop-hint span { font-weight: 600; box-shadow: var(--shadow-pop); }
 
 /* ---------- template picker ---------- */
 .tpl-backdrop {
@@ -528,3 +518,43 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
   background: transparent;
   padding: 0;
 }
+
+/* ---------- board: panels placed from the layout tree ---------- */
+/* Inset by half a gap; each cell pads by the other half (gap 10 px). */
+.layout-board { position: absolute; inset: 5px; }
+.lay-cell {
+  position: absolute;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: 5px;
+  /* a soft ease-out, no overshoot: panels settle rather than snap */
+  --lay-ease: cubic-bezier(.25, .8, .25, 1);
+  transition: left .45s var(--lay-ease), top .45s var(--lay-ease),
+              width .45s var(--lay-ease), height .45s var(--lay-ease);
+}
+.layout-board--resizing .lay-cell { transition: none; }       /* follow the divider 1:1 */
+.lay-cell--max { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; z-index: 20; }
+.lay-cell .pane--max { position: relative; inset: auto; }
+/* the dragged panel: over the others and their heads (40), under the drop targets (50).
+   Its place follows the cursor by a per-frame transform, so left/top don't animate. */
+.lay-cell--lifted {
+  z-index: 45;
+  transition: width .45s var(--lay-ease), height .45s var(--lay-ease);
+  will-change: transform;
+}
+.pane--dragging { box-shadow: var(--shadow-pop); transition: box-shadow .3s; }   /* lifted, nothing more */
+.layout-board .split-divider { position: absolute; z-index: 10; }
+.split-divider--row::after { top: 50%; left: 50%; width: 3px; height: 36px; transform: translate(-50%, -50%); }
+.split-divider--column::after { top: 50%; left: 50%; height: 3px; width: 36px; transform: translate(-50%, -50%); }
+.split-divider--active::after { opacity: 1; background: var(--primary); }
+.split-divider--row { cursor: col-resize; }
+.split-divider--column { cursor: row-resize; }
+.layout-board--resizing,
+.layout-board--resizing * { user-select: none; }
+.layout-board--resizing .lay-cell { pointer-events: none; }
+.layout-board .pane-drop { inset: auto; z-index: 50; }      /* placed by style, over the panels and their heads (40) */
+@media (prefers-reduced-motion: reduce) {
+  .lay-cell { transition: none; }
+}
+

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { brain } from '../ws/brain';
 import { useBrain } from '../store/useBrain';
 import { GazePad } from '../components/GazePad';
+import { arr, rec } from './config/fields';
 
 export type FaceSection = 'speech' | 'gaze' | 'expression' | 'say';
 
@@ -10,11 +11,14 @@ export function Face({ sections }: { sections?: FaceSection[] } = {}) {
   const show = (k: FaceSection) => !sections || sections.includes(k);
   const [sayText, setSayText] = useState('');
   const [history, setHistory] = useState<string[]>([]);
-  const [exprId, setExprId] = useState('');
+  const [exprName, setExprName] = useState('');
 
   const recognized = useBrain(s => s.recognized);
   const clearRecognized = useBrain(s => s.clearRecognized);
   const visionConfig = useBrain(s => s.visionConfig);
+  // the phone's expression names, when its settings are known (Config tab)
+  const phoneConfig = useBrain(s => s.phoneConfig);
+  const exprNames = arr<string>(rec(phoneConfig?.['face'])['expressions']).filter(n => typeof n === 'string');
 
   // Vision の gaze behavior が動いている間は同じ /look_at を奪い合うため、
   // 手動 GazePad を無効化して競合を防ぐ（排他を UI で明示）。
@@ -28,10 +32,9 @@ export function Face({ sections }: { sections?: FaceSection[] } = {}) {
   // /look_at 送信のスロットリング（ドラッグ中の publish 過多を防ぐ）
   const lastLookAtRef = useRef(0);
 
-  const handleExpression = () => {
-    const id = parseInt(exprId);
-    if (isNaN(id) || id < 1) return;
-    brain.publish('/expression', { data: id });
+  // by name (the phone matches it ignoring case; an unknown name changes nothing)
+  const sendExpression = (name: string) => {
+    if (name.trim()) brain.publish('/expression', { data: name.trim() });
   };
 
   const handleSay = () => {
@@ -105,18 +108,28 @@ export function Face({ sections }: { sections?: FaceSection[] } = {}) {
       {show('expression') && <div className="card">
         <div className="card-title">Expression</div>
         <div className="expr-row">
-          <span className="expr-hint">Expression ID (number defined in the app)</span>
+          <span className="expr-hint">Expression name (as named in the app)</span>
           <input
-            type="number"
-            min={1}
-            placeholder="ID"
-            value={exprId}
-            onChange={e => setExprId(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleExpression(); }}
-            style={{ width: 80 }}
+            aria-label="Expression name"
+            list="face-expression-names"
+            placeholder="Name"
+            value={exprName}
+            onChange={e => setExprName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') sendExpression(exprName); }}
+            style={{ width: 140 }}
           />
-          <button onClick={handleExpression}>Set</button>
+          <datalist id="face-expression-names">
+            {exprNames.map(n => <option key={n} value={n} />)}
+          </datalist>
+          <button onClick={() => sendExpression(exprName)}>Set</button>
         </div>
+        {exprNames.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {exprNames.map(n => (
+              <button key={n} style={{ fontSize: '.72rem', padding: '2px 8px' }} onClick={() => sendExpression(n)}>{n}</button>
+            ))}
+          </div>
+        )}
       </div>}
 
       {/* Speech / Say */}

@@ -4,6 +4,7 @@ import { rosClient } from '../ros/ros';
 import { createViewer3D, type Viewer3DHandle } from '../ros/viewer3d';
 import type { ConnStatus } from '../ws/types';
 import { useThemeColors } from '../theme';
+import { MapControls } from './nav/MapControls';
 
 function yawToQuat(yawDeg: number) {
   const h = (yawDeg * Math.PI / 180) / 2;
@@ -116,6 +117,8 @@ export function Nav() {
           <span className={`dot ${rosStatus}`} title={rosStatus} />
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
+
+        <MapControls rosStatus={rosStatus} />
 
         <div className="card-title">Initial Pose (/initialpose)</div>
         <div className="nav-row">

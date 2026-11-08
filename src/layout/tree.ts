@@ -1,7 +1,7 @@
 // Pure edits of a layout tree (split / close / replace / move / resize).
 // Every function returns a new tree and leaves the input untouched; nodes that
 // are not on the edited path keep their identity.
-import { isSplit, type LayoutNode, type NodePath } from './types';
+import { isSplit, type LayoutNode, type NodePath, type PanelLeaf, type SplitNode } from './types';
 
 /** Where a dragged panel lands on another one: beside it, or swapped with it. */
 export type DropZone = 'left' | 'right' | 'top' | 'bottom' | 'center';
@@ -62,4 +62,28 @@ export function moveNode(root: LayoutNode, from: NodePath, to: NodePath, zone: D
   if (!removed) return root;
   const at = pathOf(removed, dst);          // dst's path shifts when its sibling was the one removed
   return at == null ? root : splitAt(removed, at, zone, src);
+}
+
+/** Where each panel sits, as fractions of the whole layout (dividers ignored). */
+export interface Rect { x: number; y: number; w: number; h: number }
+export interface LeafRect extends Rect { leaf: PanelLeaf; path: NodePath }
+export interface SplitRect extends Rect { node: SplitNode; path: NodePath }
+
+export function leafRects(node: LayoutNode, path: NodePath = '', x = 0, y = 0, w = 1, h = 1): LeafRect[] {
+  if (!isSplit(node)) return [{ leaf: node, path, x, y, w, h }];
+  const r = node.ratio;
+  return node.split === 'row'
+    ? [...leafRects(node.a, path + 'a', x, y, w * r, h), ...leafRects(node.b, path + 'b', x + w * r, y, w * (1 - r), h)]
+    : [...leafRects(node.a, path + 'a', x, y, w, h * r), ...leafRects(node.b, path + 'b', x, y + h * r, w, h * (1 - r))];
+}
+
+export function splitRects(node: LayoutNode, path: NodePath = '', x = 0, y = 0, w = 1, h = 1): SplitRect[] {
+  if (!isSplit(node)) return [];
+  const r = node.ratio;
+  const [ra, rb]: [Rect, Rect] = node.split === 'row'
+    ? [{ x, y, w: w * r, h }, { x: x + w * r, y, w: w * (1 - r), h }]
+    : [{ x, y, w, h: h * r }, { x, y: y + h * r, w, h: h * (1 - r) }];
+  return [{ node, path, x, y, w, h },
+    ...splitRects(node.a, path + 'a', ra.x, ra.y, ra.w, ra.h),
+    ...splitRects(node.b, path + 'b', rb.x, rb.y, rb.w, rb.h)];
 }

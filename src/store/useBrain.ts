@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { brain } from '../ws/brain';
-import { esp32 } from '../ws/esp32';
+import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
 import type { ConnStatus, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
 import { deepMerge, type GpsState, type ImuState, type OdomState } from './convert';
 import { pendingPing, registerBrainHandlers } from './brainHandlers';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
+const PHONE_HOST_KEY = 'smabo-phone-host';
 
 interface LogEntry {
   id: number;
@@ -47,6 +48,9 @@ export interface BrainStore {
 
   // Config
   esp32Config: Record<string, unknown> | null;
+  /** smabo-app's (or smabo-sim's phone) settings, from its REST /config or /phone/config. */
+  phoneHost: string;
+  phoneConfig: Record<string, unknown> | null;
 
   // ESP32 ↔ brain 接続状態（notice で追跡）
   // null = 未確認（brain 接続直後など）、true/false = 確認済み
@@ -71,6 +75,9 @@ export interface BrainStore {
   /** Automatic load (startup): no error toast if the ESP32 is not reachable yet. */
   refreshConfigQuietly(): void;
   pingEsp32(): void;
+  setPhoneHost(h: string): void;
+  refreshPhoneConfig(): void;
+  patchPhoneConfig(patch: Record<string, unknown>): void;
   pingEsp32Ws(): void;
   clearRecognized(): void;
   clearTrail(): void;
@@ -101,6 +108,9 @@ export const useBrain = create<BrainStore>((set, get) => {
   const initialEsp32Host =
     (typeof localStorage !== 'undefined' && localStorage.getItem(ESP32_HOST_KEY)) || 'smabo-esp32.local';
   esp32.setHost(initialEsp32Host);
+  const initialPhoneHost =
+    (typeof localStorage !== 'undefined' && localStorage.getItem(PHONE_HOST_KEY)) || '';
+  phone.setHost(initialPhoneHost);
 
   return {
     status: 'disconnected',
@@ -123,6 +133,8 @@ export const useBrain = create<BrainStore>((set, get) => {
     visionMarkers: null,
 
     esp32Config: null,
+    phoneHost: initialPhoneHost,
+    phoneConfig: null,
     esp32Connected: null,
 
     esp32Ping: null,
@@ -165,6 +177,35 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.getConfig()
         .then(config => set({ esp32Config: config }))
         .catch(() => {});
+    },
+
+    setPhoneHost: (h) => {
+      phone.setHost(h);
+      if (typeof localStorage !== 'undefined') localStorage.setItem(PHONE_HOST_KEY, h);
+      set({ phoneHost: h });
+    },
+
+    refreshPhoneConfig: () => {
+      if (!get().phoneHost) return;
+      phone.getConfig()
+        .then(config => set({ phoneConfig: config }))
+        .catch(() => get().addToast('Failed to load phone settings', 'err'));
+    },
+
+    patchPhoneConfig: (patch) => {
+      // 楽観的に即反映してからスマホへ直接 POST。結果は /phone/config でも届く
+      set(s => ({ phoneConfig: s.phoneConfig ? deepMerge(s.phoneConfig, patch) : s.phoneConfig }));
+      phone.setConfig(patch)
+        .then(ignored => {
+          if (ignored.length) {
+            get().addToast(`Phone ignored: ${ignored.join(', ')}`, 'err');
+            get().refreshPhoneConfig();
+          }
+        })
+        .catch(() => {
+          get().addToast('Failed to send phone settings', 'err');
+          get().refreshPhoneConfig();
+        });
     },
 
     pingEsp32: () => {

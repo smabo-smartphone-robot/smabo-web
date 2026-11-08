@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { TEMPLATES, DEFAULT_TEMPLATE } from './templates';
 import { isSplit, type LayoutNode, type NodePath, type Template } from './types';
-import { setRatioAt } from './tree';
+import { setRatioAt, type DropZone } from './tree';
 
 const KEY_CURRENT = 'smabo-web.template';
 const KEY_CUSTOM = 'smabo-web.custom';
@@ -79,6 +79,7 @@ interface LayoutState {
   edited: LayoutNode | null;               // the user's copy of the open template's tree
   maximized: NodePath | null;              // a panel shown alone (double-click its title)
   dragFrom: NodePath | null;               // panel being dragged to a new place
+  dropPreview: { to: NodePath; zone: DropZone } | null;   // where it would land right now
   pickerOpen: boolean;
   open: (id: string) => void;
   setRatio: (path: NodePath, ratio: number) => void;
@@ -90,6 +91,7 @@ interface LayoutState {
   deleteCustom: (id: string) => void;
   setMaximized: (path: NodePath | null) => void;
   setDragFrom: (path: NodePath | null) => void;
+  setDropPreview: (p: { to: NodePath; zone: DropZone } | null) => void;
   setPickerOpen: (open: boolean) => void;
 }
 
@@ -114,6 +116,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     edited: loadEdited(startId, startCustom),
     maximized: null,
     dragFrom: null,
+    dropPreview: null,
     pickerOpen: false,
 
     open: (id) => {
@@ -121,7 +124,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       if (!findTemplate(id, custom)) return;
       try { localStorage.setItem(KEY_CURRENT, id); } catch { /* ignore */ }
       syncUrl(id);
-      set({ templateId: id, edited: loadEdited(id, custom), maximized: null, dragFrom: null, pickerOpen: false });
+      set({ templateId: id, edited: loadEdited(id, custom), maximized: null, dragFrom: null, dropPreview: null, pickerOpen: false });
     },
 
     setRatio: (path, ratio) => storeEdited(setRatioAt(tree(), path, clampRatio(ratio))),
@@ -175,7 +178,12 @@ export const useLayout = create<LayoutState>((set, get) => {
     },
 
     setMaximized: (maximized) => set({ maximized }),
-    setDragFrom: (dragFrom) => set({ dragFrom }),
+    setDragFrom: (dragFrom) => set({ dragFrom, dropPreview: null }),
+    setDropPreview: (p) => {
+      const cur = get().dropPreview;
+      if (cur === p || (cur && p && cur.to === p.to && cur.zone === p.zone)) return;
+      set({ dropPreview: p });
+    },
     setPickerOpen: (pickerOpen) => set({ pickerOpen }),
   };
 });

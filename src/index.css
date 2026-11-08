@@ -971,6 +971,48 @@ details[open] > summary::before {
   color: var(--dim);
 }
 
+/* ===== Expression editor (Config → Phone → Edit expressions) =====
+   The list, actions and preview sit beside the fields (above them on a narrow
+   pane); only the fields scroll, so the preview stays in view while editing. */
+.expr-editor { container: expr-editor / inline-size; }
+.expr-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.expr-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.expr-preview {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.expr-fields {
+  min-width: 0;
+  max-height: 50vh;
+  max-height: 50dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg3);
+}
+.expr-fields:focus { outline: none; }
+.expr-fields:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+@container expr-editor (min-width: 560px) {
+  .expr-body { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); align-items: start; }
+  .expr-preview { max-width: none; }
+  .expr-fields { max-height: 70vh; max-height: 70dvh; }
+}
+
 .say-input-row {
   display: flex;
   gap: 8px;
@@ -1144,6 +1186,22 @@ details[open] > summary::before {
   color: var(--cyan);
 }
 
+.nav-hint {
+  font-size: .7rem;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.nav-step {
+  font-size: .72rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.nav-row input.invalid {
+  border-color: var(--accent);
+}
+
 /* Motion Plan tab: activity log */
 .plan-log {
   font-size: .7rem;
@@ -1172,44 +1230,17 @@ details[open] > summary::before {
   overflow: auto;
 }
 
-.split {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-}
-
-.split--row { flex-direction: row; }
-.split--column { flex-direction: column; }
-
-.split-cell {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .split-divider {
-  flex: 0 0 6px;
   border-radius: 3px;
   transition: background .12s;
   touch-action: none;
 }
 
-.split--row > .split-divider { cursor: col-resize; }
-.split--column > .split-divider { cursor: row-resize; }
-
 .split-divider:hover,
-.split-divider:focus-visible,
-.split--dragging > .split-divider {
+.split-divider:focus-visible {
   background: var(--cyan);
   outline: none;
 }
-
-/* while dragging, canvases / 3D views must not swallow the pointer */
-.split--dragging,
-.split--dragging * { user-select: none; }
-.split--dragging > .split-cell { pointer-events: none; }
 
 .pane {
   flex: 1;
@@ -1510,7 +1541,6 @@ details[open] > summary::before {
 .pane:not(.pane--max) { position: relative; }   /* anchor for the drop target; a maximised pane stays absolute */
 .pane-head[draggable="true"] { cursor: grab; }
 .pane-grip { color: var(--dim); font-size: .7rem; margin-right: -2px; }
-.pane--dragging { opacity: .45; }
 
 .pane-menu-wrap { position: relative; }
 .pane-menu {
@@ -1557,28 +1587,6 @@ details[open] > summary::before {
 .layout-root--dragging iframe,
 .layout-root--dragging canvas { pointer-events: none; }
 .pane-drop { position: absolute; inset: 0; z-index: 25; }
-.pane-drop-hint {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--cyan) 22%, transparent);
-  border: 2px solid var(--cyan);
-  border-radius: 6px;
-  pointer-events: none;
-  transition: inset .08s;
-}
-.pane-drop-hint span {
-  font-size: .75rem;
-  color: var(--text);
-  background: var(--bg2);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-.pane-drop-hint--center { inset: 10%; }
-.pane-drop-hint--left   { inset: 0 50% 0 0; }
-.pane-drop-hint--right  { inset: 0 0 0 50%; }
-.pane-drop-hint--top    { inset: 0 0 50% 0; }
-.pane-drop-hint--bottom { inset: 50% 0 0 0; }
 
 /* My layouts */
 .tpl-card { position: relative; cursor: pointer; }

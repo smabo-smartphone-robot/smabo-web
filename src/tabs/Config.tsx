@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
 import { Esp32CommCheck } from './config/Esp32CommCheck';
+import { PhoneSettings } from './config/PhoneSettings';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config/fields';
 import { RandomGroupSettings } from './config/RandomGroupSettings';
 import { ServoTable } from './config/ServoTable';
@@ -33,6 +34,7 @@ export function Config() {
           <span>Config not received (set the ESP32 host in the header)</span>
           <button onClick={refreshConfig}>Get config</button>
         </div>
+        <PhoneSettings />
       </div>
     );
   }
@@ -334,9 +336,12 @@ export function Config() {
         </div>
       </details>
 
+      {/* ── Phone (smabo-app): its own REST API ─────── */}
+      <PhoneSettings />
+
       {/* ── Full config JSON ─────────────────────────── */}
       <details>
-        <summary>Full config (JSON)</summary>
+        <summary>Full ESP32 config (JSON)</summary>
         <div className="config-section">
           <pre className="config-full-json">{JSON.stringify(esp32Config, null, 2)}</pre>
         </div>

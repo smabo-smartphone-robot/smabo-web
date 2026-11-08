@@ -37,14 +37,14 @@ export function SectionHeader({ children }: { children: React.ReactNode }) {
 
 // ── InlineStr ────────────────────────────────────────────────
 
-export function InlineStr({ value, onChange, isPassword, w = 120 }: {
-  value: string; onChange: (v: string) => void; isPassword?: boolean; w?: number;
+export function InlineStr({ value, onChange, isPassword, w = 120, label }: {
+  value: string; onChange: (v: string) => void; isPassword?: boolean; w?: number; label?: string;
 }) {
   const [local, setLocal] = useState(value);
   useEffect(() => { setLocal(value); }, [value]);
   return (
     <input
-      type={isPassword ? 'password' : 'text'} value={local}
+      type={isPassword ? 'password' : 'text'} value={local} aria-label={label}
       style={{ width: w, fontSize: '.72rem', padding: '1px 4px',
                background: 'transparent', border: '1px solid var(--line)',
                borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}

@@ -16,7 +16,7 @@ const ROSBRIDGE_PUBLISH: Record<string, string> = {
   '/cmd_vel':          'geometry_msgs/msg/Twist',
   '/servo/command':    'trajectory_msgs/msg/JointTrajectory',
   '/speech/say':       'std_msgs/msg/String',
-  '/expression':       'std_msgs/msg/Int32',
+  '/expression':       'std_msgs/msg/String',
   '/look_at':          'geometry_msgs/msg/PoseStamped',
   '/ping':             'std_msgs/msg/String',
   '/vision/config':    'std_msgs/msg/String',
@@ -36,7 +36,10 @@ const ROSBRIDGE_SUBSCRIBE: Record<string, string> = {
   '/vision/detections':  'vision_msgs/msg/Detection2DArray',
   '/vision/markers':     'std_msgs/msg/String',
   '/webrtc/web_offer':   'std_msgs/msg/String',
+  '/config':             'std_msgs/msg/String',   // ESP32 settings changed → re-read over REST
   '/config_url':         'std_msgs/msg/String',
+  '/phone/config':       'std_msgs/msg/String',   // the phone's settings (JSON), on change
+  '/phone/config_url':   'std_msgs/msg/String',   // the phone's REST API, every 5 s
 };
 
 class BrainClient {

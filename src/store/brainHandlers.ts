@@ -17,8 +17,8 @@ const RECOGNIZED_MAX = 50;
 
 // High-frequency topics with large payloads are excluded from the log, which
 // would otherwise re-render the Log panel on every frame.
-// /config_url repeats every 5 s with the same value.
-const LOG_SKIP_TOPICS = new Set(['/vision/detections', '/config_url']);
+// /config_url and /phone/config_url repeat every 5 s with the same value.
+const LOG_SKIP_TOPICS = new Set(['/vision/detections', '/config_url', '/phone/config_url']);
 
 // The ESP32 waits 3 s before reconnecting, so allow up to 6 s before showing it
 // as disconnected; a "connected" notice in the meantime cancels it.
@@ -101,6 +101,31 @@ export function registerBrainHandlers(set: Set, get: Get): void {
         }
         break;
       }
+      case '/config':
+        // ESP32 の設定が変わった（別の画面・smabo-sim のモデル切替など）→ REST で読み直す
+        get().refreshConfigQuietly();
+        break;
+      case '/phone/config_url': {
+        // スマホ（smabo-app / smabo-sim）が知らせる設定 REST API の場所
+        const url = (raw as StringMsg)?.data;
+        if (typeof url === 'string' && url && url !== get().phoneHost) {
+          get().setPhoneHost(url);
+          get().addLog({ type: 'info', text: `Phone config API: ${url}` });
+          get().refreshPhoneConfig();
+        }
+        break;
+      }
+      case '/phone/config':
+        // スマホの設定が変わった（アプリの画面・REST のどちらでも）: 全体が JSON で届く
+        try {
+          const cfg = JSON.parse((raw as StringMsg).data) as unknown;
+          if (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) {
+            set({ phoneConfig: cfg as Record<string, unknown> });
+          }
+        } catch {
+          // ignore malformed config
+        }
+        break;
       case '/webrtc/web_offer': {
         // brain が中継映像を offer してきた → answer を返す
         const sdp = (raw as StringMsg)?.data;

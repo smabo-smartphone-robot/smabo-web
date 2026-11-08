@@ -62,12 +62,12 @@ rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Co
 
 | タブ | 役割 |
 |------|------|
-| Face | 表情 ID（`/expression`）・視線（`/look_at`）・発話（`/speech/say`）を送信。音声認識結果（`/speech/recognized`）を表示 |
+| Face | 表情の名前（`/expression`）・視線（`/look_at`）・発話（`/speech/say`）を送信。音声認識結果（`/speech/recognized`）を表示 |
 | Sensors | IMU・GPS の表示、カメラ映像のプレビュー（WebRTC） |
 | two wheel mobile robot | バーチャルジョイスティックで `/cmd_vel` を送信。速度上限スライダー・オドメトリ表示・Trail Map 付き |
 | Servo | ESP32 config の `joints` から生成したサーボスライダーで `/servo/command` 送信。Home ボタンで init_angle へ一括復帰 |
 | Vision | 画像処理設定（`/vision/config`：検出方法・色・ArUco・発話・behaviors）、検出結果の表示、カメラ映像のプレビュー |
-| Navigation | rosbridge 接続、`/initialpose` 送信、`navigate_to_pose` アクションのゴール送信、3D 表示（地図・`/scan`・ロボット） |
+| Navigation | rosbridge 接続、地図作成の流れ（Start SLAM → 名前を付けて Save → 保存地図を選んで Use で AMCL ナビ。`/nav/command`・`/nav/state`）、`/initialpose` 送信、`navigate_to_pose` アクションのゴール送信、3D 表示（地図・`/scan`・ロボット） |
 | Motion Plan | MoveIt の MotionPlanning パネル相当。rosbridge 接続、計画グループ（`arm` / `gripper`）の選択、目標姿勢（関節スライダー・SRDF の登録姿勢・3D で先端をドラッグして IK）、計画パラメータ、Plan（`/plan_kinematic_path`）→ 軌道のアニメーション表示 → Execute（`/execute_trajectory`）、`/servo/command` への直接送信。ロボットは URDF・メッシュを rosbridge 経由で取得して three.js で描画 |
 | Config | ESP32 config の表示・編集。Modes・Servo・Drive(DC)・Encoder・Lidar・Advanced（ピン/WiFi）を GUI で操作。Advanced はステージ制で一括 POST。REST / WebSocket の接続確認 |
 | Log | brain から受信したメッセージの一覧・フィルタ・手動 JSON 送信 |
