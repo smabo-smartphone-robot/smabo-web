@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useBrain } from '../store/useBrain';
 import { brain } from '../ws/brain';
+import { ControlBar, useControlLocked } from '../components/ControlBar';
 import { useDragOrder } from '../hooks/useDragOrder';
 
 interface ServoSpec {
@@ -63,6 +64,9 @@ export function Arm() {
   const brainOk = brainStatus === 'connected';
   // esp32Connected===null は未確認（接続直後）→ 楽観的に操作可能とする
   const connected = brainOk && esp32Connected !== false;
+  // Another tab drives: watch only (ControlBar offers Take over)
+  const controlLocked = useControlLocked();
+  const canMove = connected && !controlLocked;
   const visionServoActive = !!(
     visionConfig?.enabled &&
     visionConfig.mode !== 'off' &&
@@ -132,8 +136,10 @@ export function Arm() {
     <div className="arm-layout">
       <div className="arm-header">
         <button onClick={refreshConfig}>Get Config</button>
-        <button onClick={handleHome} disabled={!hasManual || !connected || visionServoActive}>Home</button>
+        <button onClick={handleHome} disabled={!hasManual || !canMove || visionServoActive}>Home</button>
       </div>
+
+      <ControlBar />
 
       {!connected && (
         <div className="no-data" style={{ color: 'var(--muted)' }}>
@@ -197,13 +203,13 @@ export function Arm() {
                         <input
                           type="range"
                           min={min} max={max} step={1} value={val}
-                          disabled={!connected || visionServoActive}
+                          disabled={!canMove || visionServoActive}
                           onChange={e => handleChange(name, Number(e.target.value))}
                         />
                         <span className="servo-val">{val.toFixed(0)}°</span>
                         <button
                           style={{ fontSize: '.68rem', padding: '1px 6px', flexShrink: 0 }}
-                          disabled={!connected || visionServoActive}
+                          disabled={!canMove || visionServoActive}
                           onClick={() => handleHomeOne(name, initAngle)}
                         >Home</button>
                       </div>

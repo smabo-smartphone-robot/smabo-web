@@ -92,6 +92,10 @@ token はブラウザの localStorage に brain のアドレスごとに保存�
 
 ペアリングを使う brain では、ESP32 とスマホの設定は brain の `/devices/esp32/…`・`/devices/app/…` を通ります（`src/ws/esp32.ts` の `setGateway`）。ペアリング済みの機器は brain 以外からの要求を断ります。`--no-auth` の brain と smabo-brain-ros では、今までどおり機器へ直接つなぎます。
 
+## 操作権（1 つのタブだけが動かす）
+
+smabo-brain につないでいるとき、走行（Drive のジョイスティック）とアーム（Arm）を動かせるのは 1 つのタブだけです。最初に動かしたタブが操作権を取り、ほかのタブには「○○ is driving」と **Take over**（引き継ぐ）が出て、ジョイスティックとスライダーは止まります。STOP はどのタブからでも効きます。操作中のタブは **Release** で手放せます（閉じても手放します）。決まりは brain 側（smabo-brain の `brain/control.py`）にあり、表示は `src/components/ControlBar.tsx`。smabo-brain-ros や古い brain ではこれまでどおり全タブが動かせます。
+
 ## ESP32 の Wi-Fi を Bluetooth で設定する
 
 ESP32 が Wi-Fi につながらないとき、設定パネル（ESP32 の設定が読めないとき）と smabo-esp32 テンプレートの「ESP32 Wi-Fi setup over Bluetooth」から、SSID とパスワードを Bluetooth で送れます（Improv Wi-Fi、`src/ble/improv.ts`）。Web Bluetooth は Chrome / Edge で、ページを `https://` か `http://localhost` で開いたときだけ使えます。LAN のアドレス（`http://192.168.x.x:5173`）で開いた画面ではボタンが押せないので、ESP32 の近くの PC で `localhost` を開いてください。

@@ -59,7 +59,10 @@ export interface BrainStore {
 
   // Protocol check (/brain/info and the brain's hello notices): who speaks a
   // different protocol number than this smabo-web, keyed by 'brain' / 'app' / 'esp32'.
-  brainInfo: { brain: string; version: string; protocol: number; auth: boolean } | null;
+  brainInfo: { brain: string; version: string; protocol: number; auth: boolean; control?: boolean } | null;
+  // Who drives (smabo-brain's control notice): null when the brain does not
+  // do this (smabo-brain-ros, older brains) and every tab drives as before.
+  control: { holder: string | null; you: boolean } | null;
   protocolWarnings: Record<string, string>;
 
   // Pairing with the brain: who it says we are, or why it refused us
@@ -152,6 +155,7 @@ export const useBrain = create<BrainStore>((set, get) => {
     phoneConfig: null,
     esp32Connected: null,
     brainInfo: null,
+    control: null,
     protocolWarnings: {},
     brainAuth: null,
     brainRefusal: null,

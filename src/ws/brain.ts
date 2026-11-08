@@ -213,6 +213,16 @@ class BrainClient {
     this.send({ op: 'publish', topic: `/web${topic}`, msg });
   }
 
+  /** Take control from whoever drives (smabo-brain; see its control.py). */
+  claimControl(): void {
+    this.send({ op: 'control', action: 'claim' });
+  }
+
+  /** Let go of control so another tab can drive. */
+  releaseControl(): void {
+    this.send({ op: 'control', action: 'release' });
+  }
+
   onMsg(handler: MsgHandler): () => void {
     this.msgHandlers.add(handler);
     return () => this.msgHandlers.delete(handler);

@@ -151,6 +151,7 @@ export function registerBrainHandlers(set: Set, get: Get): void {
             version: String(info['version'] ?? '?'),
             protocol: info['protocol'],
             auth: info['auth'] === true,
+            control: info['control'] === true,
           };
           const switched = (get().brainInfo?.auth ?? false) !== brainInfo.auth || !get().brainInfo;
           set({ brainInfo });
@@ -182,6 +183,11 @@ export function registerBrainHandlers(set: Set, get: Get): void {
 
   // ── connection notices (smabo-brain only: app / esp32 connect・disconnect) ──
   function onNotice(n: Record<string, unknown>): void {
+    if (n['event'] === 'control') {
+      // Who drives now (smabo-brain: one browser at a time)
+      set({ control: { holder: typeof n['holder'] === 'string' ? n['holder'] : null, you: n['you'] === true } });
+      return;
+    }
     if (!n['source'] || !n['event']) {
       if (typeof n['message'] === 'string') get().addToast(n['message']);
       return;
@@ -259,11 +265,11 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       wasConnected = false;
       // Brain が切れたら ESP32 状態も不明に戻す。再接続時のスナップショットで確定する。
       cancelEsp32Disconnect();
-      set({ previewOn: false, webrtcStream: null, esp32Connected: null, brainInfo: null, protocolWarnings: {} });
+      set({ previewOn: false, webrtcStream: null, esp32Connected: null, brainInfo: null, control: null, protocolWarnings: {} });
     } else if (s === 'unpaired') {
       get().addLog({ type: 'info', text: `Brain needs pairing (${brain.refusal?.reason ?? 'unauthorized'})` });
       wasConnected = false;
-      set({ esp32Connected: null, brainInfo: null, protocolWarnings: {} });
+      set({ esp32Connected: null, brainInfo: null, control: null, protocolWarnings: {} });
     } else if (s === 'error') {
       if (wasConnected) get().addToast('Connection error', 'err');
     }

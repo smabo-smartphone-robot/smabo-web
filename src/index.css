@@ -1648,3 +1648,14 @@ details[open] > summary::before {
   .devices-role { display: none; }
   .devices-actions { grid-column: 2 / -1; }
 }
+
+/* ===== Control ownership (Drive / Arm): one tab drives at a time ===== */
+.control-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 8px; padding: 6px 10px; border-radius: 6px;
+  font-size: .8rem; border: 1px solid var(--border);
+  text-wrap: pretty;
+}
+.control-bar button { flex: none; font-size: .74rem; padding: 3px 10px; }
+.control-bar--other { border-color: var(--orange); color: var(--text); background: rgba(217, 173, 74, .08); }
+.control-bar--you { color: var(--dim); }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { brain } from '../ws/brain';
 import { Joystick } from '../components/Joystick';
+import { ControlBar, useControlLocked } from '../components/ControlBar';
 import { TrailMap } from '../components/TrailMap';
 import { useDragOrder } from '../hooks/useDragOrder';
 
@@ -22,6 +23,7 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
     visionConfig.behaviors.drive
   );
   const { sort, handleProps, dropProps } = useDragOrder('smabo-drive-order');
+  const controlLocked = useControlLocked();
 
   const [maxLin, setMaxLin] = useState(0.3);
   const [maxAng, setMaxAng] = useState(1.0);
@@ -129,6 +131,7 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
     if (k === 'joystick') return (
       <div key="joystick" className="drive-col-joystick" {...drop}>
         <span className="drag-handle" {...hdl}>⠿</span>
+        <ControlBar />
         {visionDriveActive && (
           <div className="expr-hint" style={{ marginBottom: 8 }}>
             🟢 <b>Vision is controlling drive</b> (/cmd_vel). Disable "Drive follow" in the Vision tab to drive manually.
@@ -139,7 +142,7 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
           maxAng={maxAng}
           onCmd={handleCmd}
           onStop={handleStop}
-          disabled={visionDriveActive}
+          disabled={visionDriveActive || controlLocked}
         />
       </div>
     );

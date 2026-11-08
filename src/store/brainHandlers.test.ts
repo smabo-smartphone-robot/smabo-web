@@ -58,7 +58,7 @@ afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 describe('/brain/info', () => {
   it('stores the brain info and warns only when the protocol differs', () => {
     publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION, brain: 'smabo-brain', version: '0.2.0' })));
-    expect(store.state.brainInfo).toEqual({ brain: 'smabo-brain', version: '0.2.0', protocol: PROTOCOL_VERSION, auth: false });
+    expect(store.state.brainInfo).toEqual({ brain: 'smabo-brain', version: '0.2.0', protocol: PROTOCOL_VERSION, auth: false, control: false });
     expect(store.state.protocolWarnings).toEqual({});
 
     publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION + 1, brain: 'smabo-brain', version: '9.0.0' })));
@@ -118,6 +118,25 @@ describe('notices', () => {
   it('a notice without source shows its message', () => {
     notice({ message: 'hi' });
     expect(store.actions.addToast).toHaveBeenCalledWith('hi');
+  });
+});
+
+describe('control (one tab drives)', () => {
+  it('stores who drives, and whether it is this tab', () => {
+    notice({ event: 'control', holder: 'PC1', you: false });
+    expect(store.state.control).toEqual({ holder: 'PC1', you: false });
+    notice({ event: 'control', holder: null, you: false });
+    expect(store.state.control).toEqual({ holder: null, you: false });
+    notice({ event: 'control', holder: 'PC2', you: true });
+    expect(store.state.control).toEqual({ holder: 'PC2', you: true });
+    expect(store.actions.addToast).not.toHaveBeenCalled();
+  });
+
+  it('is forgotten on disconnect', () => {
+    notice({ event: 'control', holder: 'PC1', you: false });
+    hooks.status!('connected');
+    hooks.status!('disconnected');
+    expect(store.state.control).toBeNull();
   });
 });
 
