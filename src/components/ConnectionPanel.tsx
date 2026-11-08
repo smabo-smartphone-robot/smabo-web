@@ -2,6 +2,7 @@
 // the same checks as the guides' common start-up page, in one place.
 import { useBrain } from '../store/useBrain';
 import { Esp32CommCheck } from '../tabs/config/Esp32CommCheck';
+import { ImprovWifiSetup } from '../tabs/config/ImprovWifiSetup';
 
 type Part = 'brain' | 'app' | 'esp32';
 
@@ -50,6 +51,7 @@ export function ConnectionPanel({ parts = ['brain', 'app', 'esp32'], next }: { p
         </div>
       )}
       {parts.includes('esp32') && <Esp32CommCheck />}
+      {parts.includes('esp32') && <ImprovWifiSetup />}
       {next && (
         <div className="card conn-next">
           <div className="card-title">Next</div>

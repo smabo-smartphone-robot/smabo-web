@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
 import { Esp32CommCheck } from './config/Esp32CommCheck';
+import { ImprovWifiSetup } from './config/ImprovWifiSetup';
 import { PhoneSettings } from './config/PhoneSettings';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config/fields';
 import { RandomGroupSettings } from './config/RandomGroupSettings';
@@ -34,6 +35,7 @@ export function Config() {
           <span>Config not received (set the ESP32 host in the header)</span>
           <button onClick={refreshConfig}>Get config</button>
         </div>
+        <ImprovWifiSetup />
         <PhoneSettings />
       </div>
     );

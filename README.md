@@ -79,6 +79,10 @@ rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Co
 
 Sensors / two wheel mobile robot / Servo / Config の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。
 
+## ESP32 の Wi-Fi を Bluetooth で設定する
+
+ESP32 が Wi-Fi につながらないとき、設定パネル（ESP32 の設定が読めないとき）と smabo-esp32 テンプレートの「ESP32 Wi-Fi setup over Bluetooth」から、SSID とパスワードを Bluetooth で送れます（Improv Wi-Fi、`src/ble/improv.ts`）。Web Bluetooth は Chrome / Edge で、ページを `https://` か `http://localhost` で開いたときだけ使えます。LAN のアドレス（`http://192.168.x.x:5173`）で開いた画面ではボタンが押せないので、ESP32 の近くの PC で `localhost` を開いてください。
+
 ## テスト
 
 brain から届くメッセージの扱い（`src/store/brainHandlers.ts`）と、変換・設定のマージ（`src/store/convert.ts`）を Vitest で確かめます。

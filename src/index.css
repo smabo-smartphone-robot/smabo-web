@@ -1598,3 +1598,13 @@ details[open] > summary::before {
 
 /* while a pane is maximised the others stay mounted (3D views, form state) but are hidden */
 .layout-root--max .pane:not(.pane--max) { visibility: hidden; }
+
+/* ESP32 Wi-Fi setup over Bluetooth */
+.improv-setup { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.improv-form { display: grid; gap: 8px; width: 100%; max-width: 320px; }
+.improv-form label { display: grid; gap: 4px; font-size: .78rem; }
+.improv-device { font-weight: 600; }
+.improv-actions { display: flex; gap: 8px; }
+.improv-msg { font-size: .78rem; }
+.improv-msg.err { color: var(--accent); }
+.improv-msg.ok { color: var(--green); }
