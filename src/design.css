@@ -558,3 +558,10 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
   .lay-cell { transition: none; }
 }
 
+
+/* protocol mismatch (brain / app / ESP32 speak another protocol number) */
+.protocol-warn {
+  font-size: .72rem; font-weight: 600; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 1px 8px;
+  white-space: nowrap; cursor: help;
+}

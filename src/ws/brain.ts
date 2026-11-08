@@ -1,4 +1,5 @@
 import type { ConnStatus, RosbridgeMsg } from './types';
+import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
 
 type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
@@ -23,6 +24,7 @@ const ROSBRIDGE_PUBLISH: Record<string, string> = {
   '/webrtc/preview':   'std_msgs/msg/String',
   '/webrtc/web_answer': 'std_msgs/msg/String',
   '/webrtc/web_ice':   'std_msgs/msg/String',
+  '/hello':            'std_msgs/msg/String',   // protocol / version, once on connect
 };
 
 // Canonical topics the web reads (handled in store/brainHandlers.ts).
@@ -40,6 +42,7 @@ const ROSBRIDGE_SUBSCRIBE: Record<string, string> = {
   '/config_url':         'std_msgs/msg/String',
   '/phone/config':       'std_msgs/msg/String',   // the phone's settings (JSON), on change
   '/phone/config_url':   'std_msgs/msg/String',   // the phone's REST API, every 5 s
+  '/brain/info':         'std_msgs/msg/String',   // the brain's protocol / version
 };
 
 class BrainClient {
@@ -103,7 +106,8 @@ class BrainClient {
     };
   }
 
-  /** Announce what we publish and subscribe to what we read. */
+  /** Announce what we publish, subscribe to what we read, then say which
+   *  protocol we speak (the brain answers on /brain/info). */
   private _handshake(): void {
     for (const [topic, type] of Object.entries(ROSBRIDGE_PUBLISH)) {
       this.send({ op: 'advertise', topic: `/web${topic}`, type });
@@ -111,6 +115,9 @@ class BrainClient {
     for (const [topic, type] of Object.entries(ROSBRIDGE_SUBSCRIBE)) {
       this.send({ op: 'subscribe', topic, type, throttle_rate: topic === '/odom' ? 50 : 0 });
     }
+    this.publish('/hello', {
+      data: JSON.stringify({ protocol: PROTOCOL_VERSION, client: 'smabo-web', version: WEB_VERSION }),
+    });
   }
 
   private _scheduleReconnect(): void {

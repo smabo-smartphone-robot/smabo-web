@@ -56,6 +56,11 @@ export interface BrainStore {
   // null = 未確認（brain 接続直後など）、true/false = 確認済み
   esp32Connected: boolean | null;
 
+  // Protocol check (/brain/info and the brain's hello notices): who speaks a
+  // different protocol number than this smabo-web, keyed by 'brain' / 'app' / 'esp32'.
+  brainInfo: { brain: string; version: string; protocol: number } | null;
+  protocolWarnings: Record<string, string>;
+
   // ESP32 通信確認
   esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果（web↔ESP32）
   esp32WsPing: { ok: boolean; latencyMs: number; at: number } | null; // WS /ping→/pong エコーの往復結果（brain↔ESP32）
@@ -136,6 +141,8 @@ export const useBrain = create<BrainStore>((set, get) => {
     phoneHost: initialPhoneHost,
     phoneConfig: null,
     esp32Connected: null,
+    brainInfo: null,
+    protocolWarnings: {},
 
     esp32Ping: null,
     esp32WsPing: null,

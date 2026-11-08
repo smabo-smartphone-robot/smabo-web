@@ -13,6 +13,8 @@ export function Header() {
   const host = useBrain(s => s.host);
   const esp32Host = useBrain(s => s.esp32Host);
   const msgRate = useBrain(s => s.msgRate);
+  const protocolWarnings = useBrain(s => s.protocolWarnings);
+  const warnings = Object.values(protocolWarnings);
   const setHost = useBrain(s => s.setHost);
   const connect = useBrain(s => s.connect);
   const setEsp32Host = useBrain(s => s.setEsp32Host);
@@ -66,6 +68,12 @@ export function Header() {
         </div>
 
         <span className="msg-rate">{msgRate} msg/s</span>
+
+        {warnings.length > 0 && (
+          <span className="protocol-warn" role="status" title={warnings.join('\n')}>
+            Protocol mismatch{warnings.length > 1 ? ` (${warnings.length})` : ''}
+          </span>
+        )}
 
         <div className="theme-seg" role="radiogroup" aria-label="Theme">
           {THEME_OPTIONS.map(o => (

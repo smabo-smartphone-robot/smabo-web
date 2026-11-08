@@ -8,6 +8,7 @@ import type {
 } from '../ws/types';
 import { gpsFromMsg, imuFromMsg, odomFromMsg } from './convert';
 import type { BrainStore } from './useBrain';
+import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
 
 type Set = StoreApi<BrainStore>['setState'];
 type Get = StoreApi<BrainStore>['getState'];
@@ -40,6 +41,19 @@ export function registerBrainHandlers(set: Set, get: Get): void {
     if (esp32DisconnectTimer !== null) {
       clearTimeout(esp32DisconnectTimer);
       esp32DisconnectTimer = null;
+    }
+  };
+
+  /** Set (text) or clear (null) the protocol warning for `key`; toast when it appears. */
+  const setProtocolWarning = (key: string, text: string | null) => {
+    const cur = get().protocolWarnings;
+    if ((cur[key] ?? null) === text) return;
+    const next = { ...cur };
+    if (text === null) delete next[key]; else next[key] = text;
+    set({ protocolWarnings: next });
+    if (text !== null) {
+      get().addToast(text, 'err');
+      get().addLog({ type: 'info', text });
     }
   };
 
@@ -126,6 +140,25 @@ export function registerBrainHandlers(set: Set, get: Get): void {
           // ignore malformed config
         }
         break;
+      case '/brain/info': {
+        // The brain's protocol number (on connect and after our /hello).
+        try {
+          const info = JSON.parse((raw as StringMsg).data) as Record<string, unknown>;
+          if (typeof info['protocol'] !== 'number') break;
+          const brainInfo = {
+            brain: String(info['brain'] ?? 'brain'),
+            version: String(info['version'] ?? '?'),
+            protocol: info['protocol'],
+          };
+          set({ brainInfo });
+          setProtocolWarning('brain', brainInfo.protocol === PROTOCOL_VERSION ? null
+            : `${brainInfo.brain} ${brainInfo.version} speaks protocol ${brainInfo.protocol}; `
+              + `this smabo-web ${WEB_VERSION} speaks ${PROTOCOL_VERSION}. Update the older one.`);
+        } catch {
+          // ignore malformed info
+        }
+        break;
+      }
       case '/webrtc/web_offer': {
         // brain が中継映像を offer してきた → answer を返す
         const sdp = (raw as StringMsg)?.data;
@@ -141,7 +174,17 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       if (typeof n['message'] === 'string') get().addToast(n['message']);
       return;
     }
+    const source = String(n['source']);
+    if (n['event'] === 'hello') {
+      // smabo-brain checked an app / ESP32's protocol number against its own
+      setProtocolWarning(source, n['ok'] !== false ? null
+        : `${String(n['client'] ?? source)} ${String(n['version'] ?? '?')} speaks protocol `
+          + `${String(n['protocol'] ?? '?')}; the brain speaks ${String(n['expected'] ?? '?')}. `
+          + 'Update the older one.');
+      return;
+    }
     const connected = n['event'] === 'connected';
+    if (!connected) setProtocolWarning(source, null);
     if (n['source'] === 'esp32') {
       // Kept in the store (not only as toasts) so panels can show a steady
       // indicator without flashing on a quick reconnect.
@@ -200,7 +243,7 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       wasConnected = false;
       // Brain が切れたら ESP32 状態も不明に戻す。再接続時のスナップショットで確定する。
       cancelEsp32Disconnect();
-      set({ previewOn: false, webrtcStream: null, esp32Connected: null });
+      set({ previewOn: false, webrtcStream: null, esp32Connected: null, brainInfo: null, protocolWarnings: {} });
     } else if (s === 'error') {
       if (wasConnected) get().addToast('Connection error', 'err');
     }
