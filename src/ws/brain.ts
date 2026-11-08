@@ -1,5 +1,6 @@
 import type { ConnStatus, RosbridgeMsg } from './types';
 import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
+import { PUBLISH, SUBSCRIBE } from './protocol.gen';
 
 type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
@@ -9,41 +10,10 @@ const RECONNECT_DELAY_MS = 3000;
 // smabo-brain and smabo-brain-ros (rosbridge_suite) both serve ws://host/ and
 // take the same handshake: advertise what we publish, subscribe to what we
 // read, then publish with the '/web' source prefix. So the web needs no
-// setting for which brain is running. The tables mirror smabo-brain's
-// brain/topics.py (its tests check that they match).
-
-// Canonical topics the web publishes (sent as /web<topic>; the brain strips it).
-const ROSBRIDGE_PUBLISH: Record<string, string> = {
-  '/cmd_vel':          'geometry_msgs/msg/Twist',
-  '/servo/command':    'trajectory_msgs/msg/JointTrajectory',
-  '/speech/say':       'std_msgs/msg/String',
-  '/expression':       'std_msgs/msg/String',
-  '/look_at':          'geometry_msgs/msg/PoseStamped',
-  '/ping':             'std_msgs/msg/String',
-  '/vision/config':    'std_msgs/msg/String',
-  '/webrtc/preview':   'std_msgs/msg/String',
-  '/webrtc/web_answer': 'std_msgs/msg/String',
-  '/webrtc/web_ice':   'std_msgs/msg/String',
-  '/hello':            'std_msgs/msg/String',   // protocol / version, once on connect
-};
-
-// Canonical topics the web reads (handled in store/brainHandlers.ts).
-const ROSBRIDGE_SUBSCRIBE: Record<string, string> = {
-  '/odom':               'nav_msgs/msg/Odometry',
-  '/pong':               'std_msgs/msg/String',
-  '/speech/recognized':  'std_msgs/msg/String',
-  '/imu/data':           'sensor_msgs/msg/Imu',
-  '/gps/fix':            'sensor_msgs/msg/NavSatFix',
-  '/vision/config':      'std_msgs/msg/String',
-  '/vision/detections':  'vision_msgs/msg/Detection2DArray',
-  '/vision/markers':     'std_msgs/msg/String',
-  '/webrtc/web_offer':   'std_msgs/msg/String',
-  '/config':             'std_msgs/msg/String',   // ESP32 settings changed → re-read over REST
-  '/config_url':         'std_msgs/msg/String',
-  '/phone/config':       'std_msgs/msg/String',   // the phone's settings (JSON), on change
-  '/phone/config_url':   'std_msgs/msg/String',   // the phone's REST API, every 5 s
-  '/brain/info':         'std_msgs/msg/String',   // the brain's protocol / version
-};
+// setting for which brain is running. The tables are generated from
+// smabo-protocol (protocol.gen.ts).
+const ROSBRIDGE_PUBLISH = PUBLISH;
+const ROSBRIDGE_SUBSCRIBE = SUBSCRIBE;
 
 class BrainClient {
   private ws: WebSocket | null = null;
