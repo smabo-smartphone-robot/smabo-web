@@ -79,6 +79,14 @@ rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Co
 
 Sensors / two wheel mobile robot / Servo / Config の各パネルはドラッグで並べ替えができます（順序は localStorage に保存）。
 
+## テスト
+
+brain から届くメッセージの扱い（`src/store/brainHandlers.ts`）と、変換・設定のマージ（`src/store/convert.ts`）を Vitest で確かめます。
+
+```bash
+npm test
+```
+
 ## バージョンと互換性
 
 ほかの smabo リポジトリとは、同じ minor 番号（`0.2.x` など）どうしで組み合わせます。対応表は
