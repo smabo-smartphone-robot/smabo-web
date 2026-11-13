@@ -151,16 +151,18 @@ export function registerBrainHandlers(set: Set, get: Get): void {
             version: String(info['version'] ?? '?'),
             protocol: info['protocol'],
             auth: info['auth'] === true,
+            relay: info['relay'] === true || info['auth'] === true,
             control: info['control'] === true,
           };
-          const switched = (get().brainInfo?.auth ?? false) !== brainInfo.auth || !get().brainInfo;
+          const switched = (get().brainInfo?.relay ?? false) !== brainInfo.relay || !get().brainInfo;
           set({ brainInfo });
-          // A brain with pairing relays the devices' settings (/devices/...);
-          // without it the web talks to the devices directly.
+          // smabo-brain relays the devices' settings (/devices/...), with or
+          // without pairing; with smabo-brain-ros the web talks to the devices
+          // directly.
           const base = `http://${brain.host}/devices`;
-          esp32.setGateway(brainInfo.auth ? { base: `${base}/esp32`, token: brain.token } : null);
-          phone.setGateway(brainInfo.auth ? { base: `${base}/app`, token: brain.token } : null);
-          if (switched && brainInfo.auth) {
+          esp32.setGateway(brainInfo.relay ? { base: `${base}/esp32`, token: brain.token } : null);
+          phone.setGateway(brainInfo.relay ? { base: `${base}/app`, token: brain.token } : null);
+          if (switched && brainInfo.relay) {
             get().refreshConfigQuietly();
             if (get().phoneHost) get().refreshPhoneConfig();
           }

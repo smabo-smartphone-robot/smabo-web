@@ -7,7 +7,7 @@ type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
 
 const RECONNECT_DELAY_MS = 3000;
-// A brain with --no-auth (and smabo-brain-ros) does not answer the token
+// A brain without --pairing (the default) and smabo-brain-ros does not answer the token
 const AUTH_REPLY_TIMEOUT_MS = 1500;
 
 /** Who the brain says we are, after it accepted our token. */
@@ -77,7 +77,7 @@ class BrainClient {
       const pair = this._pendingPair;
       const token = loadToken(this._host);
       // Always ask first, even without a token: a brain with pairing refuses at
-      // once (pairing screen), smabo-brain --no-auth accepts, and one that does
+      // once (pairing screen), smabo-brain without --pairing (the default) accepts, and one that does
       // not know auth (smabo-brain-ros) says nothing until the timeout.
       if (pair) {
         this.send({ op: 'pair', code: pair.code, name: pair.name, role: 'web' });

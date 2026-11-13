@@ -58,7 +58,7 @@ afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 describe('/brain/info', () => {
   it('stores the brain info and warns only when the protocol differs', () => {
     publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION, brain: 'smabo-brain', version: '0.2.0' })));
-    expect(store.state.brainInfo).toEqual({ brain: 'smabo-brain', version: '0.2.0', protocol: PROTOCOL_VERSION, auth: false, control: false });
+    expect(store.state.brainInfo).toEqual({ brain: 'smabo-brain', version: '0.2.0', protocol: PROTOCOL_VERSION, auth: false, relay: false, control: false });
     expect(store.state.protocolWarnings).toEqual({});
 
     publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION + 1, brain: 'smabo-brain', version: '9.0.0' })));
@@ -77,6 +77,12 @@ describe('/brain/info', () => {
     expect(store.actions.refreshConfigQuietly).toHaveBeenCalled();
     publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION, auth: false })));
     expect(esp32.setGateway).toHaveBeenLastCalledWith(null);
+  });
+
+  it('a brain without pairing still relays settings when it says relay: true', () => {
+    publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION, auth: false, relay: true })));
+    expect(esp32.setGateway).toHaveBeenLastCalledWith({ base: 'http://brain.test:9090/devices/esp32', token: 'tok' });
+    expect(phone.setGateway).toHaveBeenLastCalledWith({ base: 'http://brain.test:9090/devices/app', token: 'tok' });
   });
 
   it('ignores malformed info', () => {
@@ -176,7 +182,7 @@ describe('topics', () => {
 
 describe('connection status', () => {
   it('unpaired clears the per-connection state', () => {
-    store.state.brainInfo = { brain: 'b', version: '1', protocol: 1, auth: true };
+    store.state.brainInfo = { brain: 'b', version: '1', protocol: 1, auth: true, relay: true };
     hooks.status!('unpaired');
     expect(store.state).toMatchObject({ status: 'unpaired', brainInfo: null, esp32Connected: null });
   });

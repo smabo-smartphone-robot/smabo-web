@@ -1,6 +1,7 @@
 import { useBrain } from '../store/useBrain';
 import { useTheme, type ThemePref } from '../theme';
-import { useLayout, useTemplate } from '../layout/useLayout';
+import { useState } from 'react';
+import { ConnectionDialog } from './ConnectionDialog';
 
 const THEME_OPTIONS: { pref: ThemePref; label: string; title: string }[] = [
   { pref: 'auto', label: 'Auto', title: 'Follow the OS setting' },
@@ -21,9 +22,7 @@ export function Header() {
   const refreshConfig = useBrain(s => s.refreshConfig);
   const themePref = useTheme(s => s.pref);
   const setThemePref = useTheme(s => s.setPref);
-  const customized = useLayout(s => s.edited != null);
-  const setPickerOpen = useLayout(s => s.setPickerOpen);
-  const templateTitle = useTemplate().title;
+  const [connOpen, setConnOpen] = useState(false);
 
   const isConnectedOrConnecting = status === 'connected' || status === 'connecting';
   const btnLabel = isConnectedOrConnecting ? 'Disconnect' : 'Connect';
@@ -32,15 +31,8 @@ export function Header() {
     <header>
       <div className="hrow">
         <h1>smabo<span className="brand-sub">web</span></h1>
-        <button
-          className="template-btn"
-          onClick={() => setPickerOpen(true)}
-          title="Choose a layout template"
-        >
-          <span className="template-btn-icon" aria-hidden>▦</span>
-          <span className="template-btn-name">{templateTitle}</span>
-          {customized && <span className="template-btn-edited" title="Changed from the saved layout">edited</span>}
-          <span className="template-btn-caret" aria-hidden>▾</span>
+        <button onClick={() => setConnOpen(true)} title="Connection checks and paired devices">
+          Connection
         </button>
         <div className="host-group">
         <div className={`dot ${status}`} title={status} />
@@ -90,6 +82,7 @@ export function Header() {
           ))}
         </div>
       </div>
+      {connOpen && <ConnectionDialog onClose={() => setConnOpen(false)} />}
     </header>
   );
 }

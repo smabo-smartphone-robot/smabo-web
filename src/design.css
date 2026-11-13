@@ -166,7 +166,7 @@ input[type="range"], input[type="checkbox"] { box-shadow: none; accent-color: va
 
 header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, transparent); }
 
-/* the theme switch and the template button */
+/* the theme switch */
 .theme-toggle {
   background: transparent;
   border-color: transparent;
@@ -174,21 +174,7 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 }
 .theme-toggle:hover { background: var(--bg3); color: var(--text); border-color: var(--border); }
 
-.template-btn,
-.template-btn:hover {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 600;
-  padding: 6px 10px 6px 9px;
-}
-.template-btn:hover { border-color: var(--border-strong); background: var(--bg4); }
-
 /* ---------- workspace: panes ---------- */
-.layout-root { padding: 10px; }
 
 .split-divider { background: transparent; border-radius: 0; }
 .split-divider::after {
@@ -247,7 +233,6 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 
 .pane-body { padding: 12px; }
 
-.pane--max { inset: 10px; box-shadow: var(--shadow-pop); }
 
 /* ---------- cards inside panes: inset, no double borders ---------- */
 .card,
@@ -279,9 +264,7 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 }
 .sensor-title { margin-bottom: 0; }
 
-.imu-section-label,
-.tpl-phase,
-.panel-chooser-label {
+.imu-section-label {
   text-transform: none;
   letter-spacing: 0;
   font-size: .72rem;
@@ -363,75 +346,6 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 .toast.ok { color: var(--text); border-color: var(--border); border-left-color: var(--green); }
 .toast.err { color: var(--text); border-color: var(--border); border-left-color: var(--accent); }
 
-/* ---------- menus, chooser, drop targets ---------- */
-.pane-menu {
-  border-radius: var(--r-md);
-  padding: 5px;
-  background: var(--bg2);           /* opaque: the pane's content must not show through */
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-pop);
-}
-.pane-menu button,
-.pane-menu button:hover { border-radius: 6px; font-weight: 500; box-shadow: none; border: none; background: transparent; }
-.pane-menu button:hover:not(:disabled) { background: var(--bg3); }
-
-.panel-chooser-items button { border-radius: 99px; padding: 5px 12px; }
-.panel-chooser-items button:hover { border-color: var(--primary); color: var(--text); }
-
-
-/* ---------- template picker ---------- */
-.tpl-backdrop {
-  background: color-mix(in srgb, var(--bg) 55%, transparent);
-  backdrop-filter: blur(6px);
-}
-
-.tpl-dialog {
-  border-radius: 18px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg2);
-  box-shadow: var(--shadow-pop);
-}
-
-.tpl-top { padding: 12px 14px; }
-.tpl-top .card-title { font-size: .95rem; letter-spacing: -.01em; margin: 0; }
-
-.tpl-phase { margin: 14px 0 8px; font-size: .75rem; color: var(--dim); }
-
-.tpl-card,
-.tpl-card:hover {
-  border-radius: 12px;
-  padding: 8px 8px 10px;
-  background: var(--bg3);
-  border: 1px solid transparent;
-  transition: border-color .18s, transform .18s, box-shadow .18s, background .18s;
-}
-.tpl-card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-pane); }
-.tpl-card--current,
-.tpl-card--current:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
-}
-.tpl-card--current .tpl-sub { color: var(--primary); }
-
-.tpl-thumb {
-  border-radius: 8px;
-  padding: 4px;
-  background: color-mix(in srgb, var(--bg) 55%, var(--bg3));
-}
-.thumb-leaf {
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--bg2) 91%, var(--primary));
-  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-  color: var(--dim);
-}
-.tpl-card--current .thumb-leaf { background: color-mix(in srgb, var(--bg2) 80%, var(--primary)); color: var(--text); }
-
-.tpl-name { font-size: .84rem; font-weight: 600; letter-spacing: -.01em; margin-top: 2px; }
-.tpl-sub { font-size: .72rem; }
-
-.tpl-foot { padding: 10px 14px; background: color-mix(in srgb, var(--bg3) 40%, transparent); }
-.tpl-link { color: var(--primary); font-weight: 500; }
-
 /* ---------- connection panel ---------- */
 .conn-panel .card { background: var(--bg3); }
 
@@ -459,18 +373,6 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
   letter-spacing: 0;
   color: var(--dim);
   margin-left: 3px;
-}
-
-.template-btn-icon { color: var(--primary); }
-.template-btn-name { overflow: hidden; text-overflow: ellipsis; }
-.template-btn-caret { color: var(--dim); font-size: .7rem; }
-.template-btn-edited {
-  font-size: .64rem;
-  font-weight: 600;
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  padding: 1px 5px;
-  border-radius: 4px;
 }
 
 .host-group {
@@ -517,45 +419,6 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
 .pane-body > .face-layout > .card:only-child {
   background: transparent;
   padding: 0;
-}
-
-/* ---------- board: panels placed from the layout tree ---------- */
-/* Inset by half a gap; each cell pads by the other half (gap 10 px). */
-.layout-board { position: absolute; inset: 5px; }
-.lay-cell {
-  position: absolute;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  padding: 5px;
-  /* a soft ease-out, no overshoot: panels settle rather than snap */
-  --lay-ease: cubic-bezier(.25, .8, .25, 1);
-  transition: left .45s var(--lay-ease), top .45s var(--lay-ease),
-              width .45s var(--lay-ease), height .45s var(--lay-ease);
-}
-.layout-board--resizing .lay-cell { transition: none; }       /* follow the divider 1:1 */
-.lay-cell--max { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; z-index: 20; }
-.lay-cell .pane--max { position: relative; inset: auto; }
-/* the dragged panel: over the others and their heads (40), under the drop targets (50).
-   Its place follows the cursor by a per-frame transform, so left/top don't animate. */
-.lay-cell--lifted {
-  z-index: 45;
-  transition: width .45s var(--lay-ease), height .45s var(--lay-ease);
-  will-change: transform;
-}
-.pane--dragging { box-shadow: var(--shadow-pop); transition: box-shadow .3s; }   /* lifted, nothing more */
-.layout-board .split-divider { position: absolute; z-index: 10; }
-.split-divider--row::after { top: 50%; left: 50%; width: 3px; height: 36px; transform: translate(-50%, -50%); }
-.split-divider--column::after { top: 50%; left: 50%; height: 3px; width: 36px; transform: translate(-50%, -50%); }
-.split-divider--active::after { opacity: 1; background: var(--primary); }
-.split-divider--row { cursor: col-resize; }
-.split-divider--column { cursor: row-resize; }
-.layout-board--resizing,
-.layout-board--resizing * { user-select: none; }
-.layout-board--resizing .lay-cell { pointer-events: none; }
-.layout-board .pane-drop { inset: auto; z-index: 50; }      /* placed by style, over the panels and their heads (40) */
-@media (prefers-reduced-motion: reduce) {
-  .lay-cell { transition: none; }
 }
 
 

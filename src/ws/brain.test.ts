@@ -36,7 +36,7 @@ beforeEach(() => { vi.useFakeTimers(); store.clear(); statuses.length = 0; FakeW
 afterEach(() => { brain.disconnect(); vi.useRealTimers(); });
 
 describe('brain pairing', () => {
-  it('without a token asks anyway; a --no-auth brain says yes', () => {
+  it('without a token asks anyway; a brain without pairing says yes', () => {
     brain.connect('brain:9090');
     last().open();
     expect(last().sent).toEqual([{ op: 'auth', token: '' }]);
@@ -80,7 +80,7 @@ describe('brain pairing', () => {
     expect(FakeWS.all).toHaveLength(1);      // no reconnect loop
   });
 
-  it('a brain that ignores the token (--no-auth) still gets the handshake', () => {
+  it('a brain that ignores the token (smabo-brain-ros) still gets the handshake', () => {
     store.set(TOKEN_KEY, 'tok');
     brain.connect('brain:9090');
     last().open();

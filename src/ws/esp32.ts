@@ -1,8 +1,8 @@
 // 設定の REST クライアント。
-// brain がペアリングを使うとき（/brain/info の auth: true）は、brain の
-// /devices/esp32/…・/devices/app/… に Bearer token 付きで送り、brain が機器へ転送する
-// （setGateway）。ペアリング済みの機器は brain 以外からの要求を断る。
-// --no-auth の brain では、従来どおり機器の HTTP API を直接叩く。
+// smabo-brain（/brain/info の relay: true）には、brain の /devices/esp32/…・
+// /devices/app/… に送り、brain が機器へ転送する（setGateway）。ペアリングを使う brain
+// （--pairing）では Bearer token も付ける。ペアリング済みの機器は brain 以外からの要求を断る。
+// smabo-brain-ros（relay なし）では、従来どおり機器の HTTP API を直接叩く。
 //   ESP32（port 80）:
 //     GET  /config          → 全 config
 //     POST /config {patch}  → config パッチ適用（ピン変更時は ESP32 再起動）
