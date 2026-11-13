@@ -69,10 +69,10 @@ export function Config() {
   const stage = (fn: MergeSetFn) => setStaged(fn);
 
   // Shared layout helpers
-  const lbl: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
+  const lbl: React.CSSProperties = { fontSize: '.75rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
   const fg2: React.CSSProperties = {
     display: 'grid', gridTemplateColumns: 'max-content auto',
-    columnGap: 10, rowGap: 4, alignItems: 'center', marginBottom: 8,
+    columnGap: 16, rowGap: 8, alignItems: 'center', marginBottom: 12,
   };
   const zero: React.CSSProperties = {
     fontSize: '.72rem', color: 'var(--line)', textAlign: 'center',
@@ -200,7 +200,7 @@ export function Config() {
               </div>
               <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 4 }}>covariance (applied on smabo-brain side)</div>
               <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 2 }}>pose (x, y, θ)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: 3, marginBottom: 8, width: 'fit-content' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: 6, marginBottom: 12, width: 'fit-content' }}>
                 <InlineNum value={n(encCov['pose_xx'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { pose_xx: v } } })} />
                 <span style={zero}>0</span><span style={zero}>0</span>
                 <span style={zero}>0</span>
@@ -210,7 +210,7 @@ export function Config() {
                 <InlineNum value={n(encCov['pose_aa'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { pose_aa: v } } })} />
               </div>
               <div style={{ fontSize: '.68rem', color: 'var(--dim)', marginBottom: 2 }}>twist (v, ω)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: 3, marginBottom: 8, width: 'fit-content' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: 6, marginBottom: 12, width: 'fit-content' }}>
                 <InlineNum value={n(encCov['twist_vv'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { twist_vv: v } } })} />
                 <span style={zero}>0</span>
                 <span style={zero}>0</span>
