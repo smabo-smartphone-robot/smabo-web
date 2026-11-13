@@ -354,6 +354,10 @@ input[type="checkbox"] {
   cursor: grabbing;
   opacity: 1;
 }
+/* while moving an item (useDragOrder): like swapping workspace panes */
+[data-drag-state="source"] { opacity: .35; }
+[data-drag-state="over"] { outline: 2px solid var(--primary); outline-offset: -2px; }
+[data-drag-state="over"] > * { opacity: .6; }
 
 /* ===== Drive Tab ===== */
 .drive-layout {
