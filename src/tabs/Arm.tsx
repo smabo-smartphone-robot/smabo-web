@@ -213,7 +213,7 @@ export function Arm() {
                           onClick={() => handleHomeOne(name, initAngle)}
                         >Home</button>
                       </div>
-                      <div style={{ fontSize: '.7rem', color: 'var(--dim)' }}>
+                      <div style={{ fontSize: '.72rem', color: 'var(--dim)', marginTop: 6 }}>
                         {min}° ~ {max}°　init: {initAngle}°
                       </div>
                     </>

@@ -49,10 +49,10 @@ function deepMerge(a: Obj, b: Obj): Obj {
   return out;
 }
 
-const lbl = { fontSize: '.68rem', color: 'var(--dim)', whiteSpace: 'nowrap' } as const;
+const lbl = { fontSize: '.75rem', color: 'var(--dim)', whiteSpace: 'nowrap' } as const;
 const grid = {
   display: 'grid', gridTemplateColumns: 'minmax(110px, max-content) minmax(0, 1fr)',
-  columnGap: 10, rowGap: 4, alignItems: 'center', marginBottom: 6,
+  columnGap: 16, rowGap: 8, alignItems: 'center', marginBottom: 10,
 } as const;
 
 function FieldInput({ f, value, onChange }: { f: Field; value: unknown; onChange: (v: unknown) => void }) {

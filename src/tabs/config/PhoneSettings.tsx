@@ -7,12 +7,12 @@ import { useBrain } from '../../store/useBrain';
 import { ExpressionEditor } from './ExpressionEditor';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './fields';
 
-const lbl: React.CSSProperties = { fontSize: '.68rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
+const lbl: React.CSSProperties = { fontSize: '.75rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
 const grid: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: 'max-content auto',
-  columnGap: 10, rowGap: 4, alignItems: 'center', marginBottom: 8,
+  columnGap: 16, rowGap: 8, alignItems: 'center', marginBottom: 12,
 };
-const unit: React.CSSProperties = { color: 'var(--dim)', fontSize: '.68rem', marginLeft: 4 };
+const unit: React.CSSProperties = { color: 'var(--dim)', fontSize: '.75rem', marginLeft: 6 };
 
 export function PhoneSettings() {
   const cfg = useBrain(st => st.phoneConfig);

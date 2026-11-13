@@ -428,3 +428,47 @@ header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, trans
   border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 1px 8px;
   white-space: nowrap; cursor: help;
 }
+
+/* ---------- spacing: label / control rhythm inside tabs ----------
+   One vertical rhythm for settings: 12px between fields, 6px between a label
+   and its control when they stack, 18px above a new section heading. */
+.card-title { margin-bottom: 12px; }
+.expr-hint, .nav-hint { line-height: 1.5; }
+
+/* settings fields (Vision, Config …) */
+.config-field { row-gap: 6px; column-gap: 12px; min-height: 30px; }
+.card > .config-field,
+.behavior-settings > .config-field { margin-bottom: 10px; }
+.card > .config-field:last-child,
+.behavior-settings > .config-field:last-child { margin-bottom: 0; }
+.config-field label { flex: 1 1 110px; line-height: 1.35; }
+.config-field + .expr-hint { margin-bottom: 12px !important; }
+.behavior-settings { margin: 0 0 14px; padding-left: 14px; }
+.card > .expr-hint { margin-bottom: 12px; }
+
+/* Navigation / Motion Plan: sections separated, headings close to their controls */
+.nav-controls { gap: 10px; }
+.nav-controls .card-title { margin-bottom: 0; }
+.nav-controls > .card-title:not(:first-child),
+.nav-controls > div > .card-title:not(:first-child) {
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.nav-step { margin-top: 6px; }
+.nav-field { gap: 4px; }
+
+/* Sensors / Drive rows */
+.imu-section-label { margin: 14px 0 8px; }
+.sensor-header + .imu-section-label { margin-top: 2px; }
+.imu-row { margin-bottom: 8px; }
+.speed-row { margin-bottom: 10px; }
+.speed-row:last-child { margin-bottom: 0; }
+
+/* Servo cards */
+.servo-card { padding: 12px 14px; }
+.servo-name { margin-bottom: 10px; gap: 8px; }
+.servo-row { gap: 10px; }
+/* label · slider · value on one line; a long value wraps to the right edge */
+.config-field input[type="range"] { flex: 1 1 80px; }
+.config-field .val { min-width: 44px; margin-left: auto; }

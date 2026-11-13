@@ -28,7 +28,7 @@ export function SectionHeader({ children }: { children: React.ReactNode }) {
     <div style={{
       fontSize: '.72rem', fontWeight: 700, color: 'var(--ink)',
       borderLeft: '3px solid var(--accent)', paddingLeft: 8,
-      marginTop: 10, marginBottom: 6,
+      marginTop: 18, marginBottom: 10,
     }}>
       {children}
     </div>
@@ -45,7 +45,7 @@ export function InlineStr({ value, onChange, isPassword, w = 120, label }: {
   return (
     <input
       type={isPassword ? 'password' : 'text'} value={local} aria-label={label}
-      style={{ width: w, fontSize: '.72rem', padding: '1px 4px',
+      style={{ width: w, fontSize: '.75rem', padding: '3px 6px',
                background: 'transparent', border: '1px solid var(--line)',
                borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}
       onChange={e => setLocal(e.target.value)}
@@ -70,7 +70,7 @@ export function InlineNum({ value, onChange, isInt, w = 50 }: {
   return (
     <input
       type="text" inputMode={isInt ? 'numeric' : 'decimal'} value={local}
-      style={{ width: w, fontSize: '.72rem', padding: '1px 4px', textAlign: 'right',
+      style={{ width: w, fontSize: '.75rem', padding: '3px 6px', textAlign: 'right',
                background: 'transparent', border: '1px solid var(--line)',
                borderRadius: 3, color: 'var(--ink)', boxSizing: 'border-box' }}
       onChange={e => setLocal(e.target.value)}
