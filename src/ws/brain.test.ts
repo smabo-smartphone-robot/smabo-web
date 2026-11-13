@@ -76,8 +76,34 @@ describe('brain pairing', () => {
     expect(store.has(TOKEN_KEY)).toBe(false);
     expect(brain.refusal?.reason).toBe('unauthorized');
     last().onclose?.();
-    vi.advanceTimersByTime(10000);
+    vi.advanceTimersByTime(4000);
     expect(FakeWS.all).toHaveLength(1);      // no reconnect loop
+  });
+
+  it('while refused, re-checks quietly and connects once the brain accepts', () => {
+    brain.connect('brain:9090');
+    last().open();
+    last().reply({ op: 'auth', ok: false, reason: 'wrong_code' });
+    last().onclose?.();
+    vi.advanceTimersByTime(5000);
+    expect(FakeWS.all).toHaveLength(2);
+    last().open();
+    expect(last().sent).toEqual([{ op: 'auth', token: '' }]);
+    last().reply({ op: 'auth', ok: false, reason: 'unauthorized' });
+    expect(statuses.filter(s => s === 'connecting')).toHaveLength(1);   // no flicker
+    expect(statuses[statuses.length - 1]).toBe('unpaired');
+    expect(brain.refusal?.reason).toBe('wrong_code');                   // the screen keeps its message
+    last().onclose?.();
+    vi.advanceTimersByTime(5000);
+    last().onerror?.();                      // the brain is restarting: nobody there
+    last().onclose?.();
+    expect(statuses[statuses.length - 1]).toBe('unpaired');
+    vi.advanceTimersByTime(5000);
+    last().open();
+    vi.advanceTimersByTime(1600);            // restarted as smabo-brain-ros: no answer to auth
+    expect(statuses[statuses.length - 1]).toBe('connected');
+    expect(ops(last())).toContain('advertise');
+    expect(brain.refusal).toBeNull();
   });
 
   it('a brain that ignores the token (smabo-brain-ros) still gets the handshake', () => {

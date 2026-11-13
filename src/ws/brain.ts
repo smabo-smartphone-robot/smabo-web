@@ -7,6 +7,9 @@ type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
 
 const RECONNECT_DELAY_MS = 3000;
+// while refused (pairing screen): check again now and then, quietly, so a brain
+// restarted without pairing (or smabo-brain-ros) is picked up without a reload
+const UNPAIRED_RETRY_MS = 5000;
 // A brain without --pairing (the default) and smabo-brain-ros does not answer the token
 const AUTH_REPLY_TIMEOUT_MS = 1500;
 
@@ -25,7 +28,9 @@ const ROSBRIDGE_SUBSCRIBE = SUBSCRIBE;
 
 // Pairing (smabo-brain): the first frame is our token ({op:'auth'}, empty
 // without one) or a code ({op:'pair'}); the brain answers with the same op.
-// Refused → status 'unpaired' and the pairing screen, without a retry loop.
+// Refused → status 'unpaired' and the pairing screen. No reconnect loop, but
+// a quiet re-check every UNPAIRED_RETRY_MS: the status stays 'unpaired' until
+// the brain accepts us (it was restarted without pairing, or it is brain-ros).
 
 class BrainClient {
   private ws: WebSocket | null = null;
@@ -38,6 +43,8 @@ class BrainClient {
   private _authTimer: ReturnType<typeof setTimeout> | null = null;
   private _pendingPair: { code: string; name: string } | null = null;
   private _ready = false;
+  /** Re-check a brain that refused us (until pair() / connect() / disconnect()). */
+  private _recheck = false;
   /** Set once the brain accepted our token; null with a brain that has no pairing. */
   auth: BrainAuth | null = null;
   refusal: BrainRefusal | null = null;
@@ -55,18 +62,21 @@ class BrainClient {
     if (this._shouldReconnect && this._host === host) return;
     if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
     if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
+    this._recheck = false;
     this._host = host;
     this._shouldReconnect = true;
     this._doConnect();
   }
 
   private _doConnect(): void {
-    this._setStatus('connecting');
+    // a quiet re-check keeps the pairing screen up instead of flashing "connecting"
+    if (!this._recheck) this._setStatus('connecting');
     const url = `ws://${this._host}/`;
 
     try {
       this.ws = new WebSocket(url);
     } catch {
+      if (this._recheck) { this._scheduleRecheck(); return; }
       this._setStatus('error');
       this._scheduleReconnect();
       return;
@@ -102,13 +112,16 @@ class BrainClient {
     };
 
     this.ws.onerror = () => {
-      this._setStatus('error');
+      if (!this._recheck) this._setStatus('error');   // a failed re-check stays on the pairing screen
     };
 
     this.ws.onclose = () => {
       this.ws = null;
       this._clearAuthTimer();
-      if (this._status === 'unpaired') return;   // wait for a code; no retry loop
+      if (this._recheck) {                        // wait for a code; re-check quietly
+        this._scheduleRecheck();
+        return;
+      }
       if (this._status !== 'error') {
         this._setStatus('disconnected');
       }
@@ -125,6 +138,11 @@ class BrainClient {
     this._clearAuthTimer();
     if (this._ready) return;
     this._ready = true;
+    if (this._recheck) {               // a re-check got in: back to normal reconnects
+      this._recheck = false;
+      this._shouldReconnect = true;
+      this.refusal = null;
+    }
     this._handshake();
     this._setStatus('connected');
   }
@@ -142,10 +160,14 @@ class BrainClient {
     }
     const reason = String(m['reason'] ?? 'unauthorized');
     if (m['op'] === 'auth' && reason === 'unauthorized') clearToken(host);   // the brain forgot us
+    const recheck = this._recheck && this._status === 'unpaired';
     this._pendingPair = null;
     this.auth = null;
-    this.refusal = { reason, message: String(m['message'] ?? '') };
+    // a re-check refused again keeps what the screen says (e.g. "wrong code")
+    if (!recheck) this.refusal = { reason, message: String(m['message'] ?? '') };
     this._shouldReconnect = false;
+    this._recheck = true;
+    this.ws?.close();
     this._ready = false;
     this._setStatus('unpaired');
   }
@@ -178,6 +200,14 @@ class BrainClient {
     });
   }
 
+  private _scheduleRecheck(): void {
+    if (!this._recheck) return;
+    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = setTimeout(() => {
+      if (this._recheck) this._doConnect();
+    }, UNPAIRED_RETRY_MS);
+  }
+
   private _scheduleReconnect(): void {
     if (!this._shouldReconnect) return;
     if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
@@ -188,6 +218,7 @@ class BrainClient {
 
   disconnect(): void {
     this._shouldReconnect = false;
+    this._recheck = false;
     this._clearAuthTimer();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
