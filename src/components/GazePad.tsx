@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import { useThemeColors } from '../theme';
 
 interface GazePadProps {
   /** 視線方向を通知する。x=画面右(+)、y=画面下(+)、各 -1..1 */
@@ -23,8 +24,12 @@ export function GazePad({ onGaze, disabled = false }: GazePadProps) {
   onGazeRef.current = onGaze;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+  const colors = useThemeColors();
+  const colorsRef = useRef(colors);
+  colorsRef.current = colors;
 
   const draw = useCallback(() => {
+    const t = colorsRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -35,14 +40,14 @@ export function GazePad({ onGaze, disabled = false }: GazePadProps) {
     ctx.clearRect(0, 0, SIZE, SIZE);
 
     // 枠
-    ctx.strokeStyle = '#1e3a5f';
+    ctx.strokeStyle = t.border;
     ctx.lineWidth = 2;
     ctx.strokeRect(PAD, PAD, SIZE - PAD * 2, SIZE - PAD * 2);
-    ctx.fillStyle = 'rgba(15,52,96,0.4)';
+    ctx.fillStyle = t.padFill;
     ctx.fillRect(PAD, PAD, SIZE - PAD * 2, SIZE - PAD * 2);
 
     // 十字ガイド
-    ctx.strokeStyle = '#1e3a5f';
+    ctx.strokeStyle = t.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(PAD, c); ctx.lineTo(SIZE - PAD, c);
@@ -54,9 +59,9 @@ export function GazePad({ onGaze, disabled = false }: GazePadProps) {
     const dy = c + dotRef.current.y * half;
     ctx.beginPath();
     ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
-    ctx.fillStyle = '#00bcd4';
+    ctx.fillStyle = t.cyan;
     ctx.fill();
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = t.knobEdge;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }, []);
@@ -84,7 +89,7 @@ export function GazePad({ onGaze, disabled = false }: GazePadProps) {
     onGazeRef.current(0, 0);
   }, [draw]);
 
-  useEffect(() => { draw(); }, [draw]);
+  useEffect(() => { draw(); }, [draw, colors]);   // redraw on theme change
 
   useEffect(() => {
     const canvas = canvasRef.current;

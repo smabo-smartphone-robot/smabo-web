@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import { useThemeColors } from '../theme';
 
 interface JoystickProps {
   maxLin: number;
@@ -19,8 +20,12 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
   const keysRef = useRef({ w: false, a: false, s: false, d: false, space: false });
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+  const colors = useThemeColors();
+  const colorsRef = useRef(colors);
+  colorsRef.current = colors;
 
   const draw = useCallback(() => {
+    const c = colorsRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -34,14 +39,14 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
     // Outer circle
     ctx.beginPath();
     ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
-    ctx.strokeStyle = '#1e3a5f';
+    ctx.strokeStyle = c.border;
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.fillStyle = 'rgba(15,52,96,0.4)';
+    ctx.fillStyle = c.padFill;
     ctx.fill();
 
     // Cross guides
-    ctx.strokeStyle = '#1e3a5f';
+    ctx.strokeStyle = c.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(cx - RADIUS, cy);
@@ -56,9 +61,12 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
 
     ctx.beginPath();
     ctx.arc(sx, sy, STICK_R, 0, Math.PI * 2);
-    ctx.fillStyle = '#e94560';
+    ctx.fillStyle = c.cyan;          // the accent (--primary); red is kept for STOP
+    ctx.shadowColor = c.cyan;
+    ctx.shadowBlur = 14;
     ctx.fill();
-    ctx.strokeStyle = '#fff';
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = c.knobEdge;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }, []);
@@ -85,7 +93,7 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
 
   useEffect(() => {
     draw();
-  }, [draw]);
+  }, [draw, colors]);   // redraw on theme change
 
   // When disabled, immediately stop and reset stick
   const onStopRef = useRef(onStop);

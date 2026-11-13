@@ -1,0 +1,474 @@
+/* ===== Design layer =====
+   Loaded after index.css and overrides its look: type, surfaces, controls.
+   Layout and behaviour stay in index.css; colours come from the tokens there.
+
+   Direction: an instrument panel for a small robot. Warm graphite (or paper)
+   surfaces, one signal-orange accent, sans text, monospaced numbers. */
+
+/* ---------- type ---------- */
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body,
+button, input, select, textarea,
+.tab-nav button {
+  font-family: var(--font-sans);
+}
+
+body { font-size: 14px; line-height: 1.45; font-feature-settings: "ss01", "cv11"; }
+
+/* numbers, topics and raw messages read better monospaced, with even digits */
+.telem-val, .val, .imu-val, .servo-val, .gps-val, .esp32-check-val, .msg-rate,
+.log-list, .log-topic, .log-msg-json, .log-send-form textarea, .config-full-json,
+.joystick-hints span, .speed-row .val, code, pre,
+input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.expr-hint, .no-data { text-wrap: pretty; }
+
+/* ---------- background: soft light falloff + grain ---------- */
+body {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, color-mix(in srgb, var(--info) 5%, transparent), transparent 60%),
+    var(--bg);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* ---------- header ---------- */
+header {
+  background: color-mix(in srgb, var(--bg2) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 14px;
+  position: relative;
+  z-index: 40;
+}
+
+.hrow { gap: 8px; }
+
+h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  color: var(--text);
+  margin-right: 6px;
+}
+h1::before {
+  content: "";
+  align-self: center;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 3px;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.msg-rate { font-size: .72rem; color: var(--dim); min-width: 62px; }
+
+.dot { width: 8px; height: 8px; }
+.dot.connected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.dot.error { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* ---------- controls ---------- */
+button {
+  font-size: .8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset;
+  transition: background .18s, border-color .18s, color .18s, transform .08s, box-shadow .18s;
+}
+
+button:hover {
+  background: var(--bg4);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:disabled:hover { background: var(--bg3); border-color: var(--border); }
+
+button:focus-visible,
+[role="button"]:focus-visible,
+.split-divider:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+button.primary:hover { background: color-mix(in srgb, var(--primary) 88%, white); border-color: transparent; color: var(--primary-ink); }
+
+button.danger,
+.stop-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.danger:hover,
+.stop-btn:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 85%, black);
+  border-color: transparent;
+  color: #fff;
+}
+
+.stop-btn {
+  font-weight: 700;
+  letter-spacing: .14em;
+  padding: 10px 24px;
+  border-radius: var(--r-md);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .2) inset, 0 8px 20px -10px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+input, select, textarea {
+  font-size: .8rem;
+  padding: 6px 9px;
+  border-radius: var(--r-sm);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  transition: border-color .18s, box-shadow .18s, background .18s;
+}
+input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
+input:focus, select:focus, textarea:focus {
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+  box-shadow: var(--ring);
+}
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--dim) 75%, transparent); }
+
+input[type="range"], input[type="checkbox"] { box-shadow: none; accent-color: var(--primary); }
+
+header input[type="text"] { background: color-mix(in srgb, var(--bg3) 80%, transparent); }
+
+/* the theme switch */
+.theme-toggle {
+  background: transparent;
+  border-color: transparent;
+  color: var(--dim);
+}
+.theme-toggle:hover { background: var(--bg3); color: var(--text); border-color: var(--border); }
+
+/* ---------- workspace: panes ---------- */
+
+.split-divider { background: transparent; border-radius: 0; }
+.split-divider::after {
+  content: "";
+  position: absolute;
+  border-radius: 99px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity .18s, background .18s;
+}
+.split-divider:hover,
+.split-divider:focus-visible { background: transparent; }
+.split-divider:hover::after,
+.split-divider:focus-visible::after { opacity: 1; }
+
+.pane {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pane);
+}
+
+.pane-head {
+  min-height: 36px;
+  padding: 4px 6px 4px 12px;
+  background: transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  gap: 4px;
+}
+
+.pane-title {
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  text-transform: none;
+  color: var(--text);
+}
+
+.pane-grip { color: var(--dim); opacity: .5; transition: opacity .18s; }
+.pane-head:hover .pane-grip { opacity: 1; }
+
+.pane-btn,
+.pane-btn:hover {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--dim);
+}
+.pane-btn:hover { background: var(--bg3); color: var(--text); }
+
+.pane-body { padding: 12px; }
+
+
+/* ---------- cards inside panes: inset, no double borders ---------- */
+.card,
+.sensor-card {
+  background: var(--bg3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: 12px 14px 14px;
+}
+
+/* a lone card filling its pane doesn't need its own box */
+.pane-body > .card:only-child,
+.pane-body > div > .card:only-child:not(.conn-panel .card) {
+  background: transparent;
+  padding: 2px;
+}
+
+.card-title,
+.sensor-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.sensor-title { margin-bottom: 0; }
+
+.imu-section-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--dim);
+}
+
+.drag-handle { opacity: .35; transition: opacity .18s; }
+.card:hover .drag-handle, .sensor-card:hover .drag-handle { opacity: .8; }
+
+/* values: text colour, monospaced; the accent is for state, not for every number */
+.telem-val, .imu-val, .servo-val, .speed-row .val { color: var(--text); font-weight: 500; }
+.gps-val { color: var(--text); }
+.telem-row { padding: 4px 0; border-bottom: 1px dashed color-mix(in srgb, var(--border) 80%, transparent); }
+.telem-row:last-child { border-bottom: none; }
+
+.imu-bar-wrap { height: 6px; background: color-mix(in srgb, var(--bg) 60%, var(--bg3)); }
+.imu-bar { border-radius: 3px; }
+.imu-bar-wrap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+}
+
+.joystick-hints span {
+  background: var(--bg2);
+  border-color: var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.camera-placeholder {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--border) 35%, transparent) 10px 11px);
+  padding: 32px 20px;
+}
+
+.camera-img { border-radius: var(--r-md); }
+
+.live-dot.live { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 45%, transparent); }
+  50% { box-shadow: 0 0 0 4px transparent; }
+}
+
+.staged-notice { border-radius: var(--r-sm); background: color-mix(in srgb, var(--orange) 10%, transparent); }
+
+.config-section { border-top-color: color-mix(in srgb, var(--border) 70%, transparent); }
+
+/* ---------- classic tabs ---------- */
+.tab-nav { background: transparent; padding: 0 6px; gap: 2px; }
+.tab-nav button {
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 500;
+  border-bottom-width: 2px;
+}
+.tab-nav button:hover { background: transparent; }
+.tab-nav button.active { color: var(--text); border-bottom-color: var(--primary); }
+
+/* ---------- toast ---------- */
+.toast {
+  background: color-mix(in srgb, var(--bg2) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  padding: 9px 14px 9px 12px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--dim);
+}
+.toast.ok { color: var(--text); border-color: var(--border); border-left-color: var(--green); }
+.toast.err { color: var(--text); border-color: var(--border); border-left-color: var(--accent); }
+
+/* ---------- connection panel ---------- */
+.conn-panel .card { background: var(--bg3); }
+
+/* ---------- scrollbars ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* ---------- header parts ---------- */
+.brand-sub {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: .7rem;
+  letter-spacing: 0;
+  color: var(--dim);
+  margin-left: 3px;
+}
+
+.host-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 3px 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--r-sm) + 3px);
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+}
+.host-group input { border-color: transparent; background: transparent; padding-left: 2px; }
+.host-group input:hover { border-color: transparent; }
+.host-group > button { padding: 4px 11px; }
+
+.theme-seg {
+  margin-left: auto;
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--r-sm) + 2px);
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+}
+.theme-seg button,
+.theme-seg button:hover {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 3px 9px;
+  font-size: .72rem;
+  color: var(--dim);
+}
+.theme-seg button:hover { color: var(--text); }
+.theme-seg button.on { background: var(--bg3); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 1px 0 rgba(255, 255, 255, .04) inset; }
+
+@media (max-width: 767px) {
+  .host-group { flex: 1 1 100%; }
+  .host-group input { flex: 1; min-width: 0; width: auto !important; }
+}
+
+/* a pane showing a single section: the pane already frames it */
+.pane-body > .sensors-layout > .sensor-card:only-child,
+.pane-body > .face-layout > .card:only-child {
+  background: transparent;
+  padding: 0;
+}
+
+
+/* protocol mismatch (brain / app / ESP32 speak another protocol number) */
+.protocol-warn {
+  font-size: .72rem; font-weight: 600; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 1px 8px;
+  white-space: nowrap; cursor: help;
+}
+
+/* ---------- spacing: label / control rhythm inside tabs ----------
+   One vertical rhythm for settings: 12px between fields, 6px between a label
+   and its control when they stack, 18px above a new section heading. */
+.card-title { margin-bottom: 12px; }
+.expr-hint, .nav-hint { line-height: 1.5; }
+
+/* settings fields (Vision, Config …) */
+.config-field { row-gap: 6px; column-gap: 12px; min-height: 30px; }
+.card > .config-field,
+.behavior-settings > .config-field { margin-bottom: 10px; }
+.card > .config-field:last-child,
+.behavior-settings > .config-field:last-child { margin-bottom: 0; }
+.config-field label { flex: 1 1 110px; line-height: 1.35; }
+.config-field + .expr-hint { margin-bottom: 12px !important; }
+.behavior-settings { margin: 0 0 14px; padding-left: 14px; }
+.card > .expr-hint { margin-bottom: 12px; }
+
+/* Navigation / Motion Plan: sections separated, headings close to their controls */
+.nav-controls { gap: 10px; }
+.nav-controls .card-title { margin-bottom: 0; }
+.nav-controls > .card-title:not(:first-child),
+.nav-controls > div > .card-title:not(:first-child) {
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.nav-step { margin-top: 6px; }
+.nav-field { gap: 4px; }
+
+/* Sensors / Drive rows */
+.imu-section-label { margin: 14px 0 8px; }
+.sensor-header + .imu-section-label { margin-top: 2px; }
+.imu-row { margin-bottom: 8px; }
+.speed-row { margin-bottom: 10px; }
+.speed-row:last-child { margin-bottom: 0; }
+
+/* Servo cards */
+.servo-card { padding: 12px 14px; }
+.servo-name { margin-bottom: 10px; gap: 8px; }
+.servo-row { gap: 10px; }
+/* label · slider · value on one line; a long value wraps to the right edge */
+.config-field input[type="range"] { flex: 1 1 80px; }
+.config-field .val { min-width: 44px; margin-left: auto; }
