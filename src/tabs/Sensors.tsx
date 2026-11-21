@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useBrain } from '../store/useBrain';
 import { useDragOrder } from '../hooks/useDragOrder';
+import { ScanView } from '../components/ScanView';
 
 function ImuBar({ value, max }: { value: number; max: number }) {
   const pct = Math.min(1, Math.abs(value) / max) * 50;
@@ -19,7 +20,7 @@ function ImuBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-const SENSOR_KEYS = ['imu', 'gps', 'camera'] as const;
+const SENSOR_KEYS = ['imu', 'gps', 'camera', 'scan'] as const;
 type SK = (typeof SENSOR_KEYS)[number];
 
 export type SensorSection = SK;
@@ -28,6 +29,7 @@ export type SensorSection = SK;
 export function Sensors({ sections }: { sections?: SensorSection[] } = {}) {
   const imu          = useBrain(s => s.imu);
   const gps          = useBrain(s => s.gps);
+  const scan         = useBrain(s => s.scan);
   const status       = useBrain(s => s.status);
   const webrtcStream = useBrain(s => s.webrtcStream);
   const previewOn    = useBrain(s => s.previewOn);
@@ -118,6 +120,35 @@ export function Sensors({ sections }: { sections?: SensorSection[] } = {}) {
               >
                 <button style={{ width: '100%', fontSize: '.75rem' }}>Open in Google Maps</button>
               </a>
+            </div>
+          </>
+        ) : (
+          <div className="no-data">No data</div>
+        )}
+      </div>
+    );
+
+    if (k === 'scan') return (
+      <div key="scan" className="sensor-card" {...drop}>
+        <div className="sensor-header">
+          <span className="drag-handle" {...hdl}>⠿</span>
+          <span className="sensor-title">Lidar /scan</span>
+          <div className={`live-dot ${scan ? 'live' : ''}`} />
+        </div>
+        {scan ? (
+          <>
+            <ScanView scan={scan} />
+            <div className="gps-row">
+              <span className="gps-label">Points</span>
+              <span className="gps-val">{scan.points.length}</span>
+            </div>
+            <div className="gps-row">
+              <span className="gps-label">Farthest</span>
+              <span className="gps-val">{scan.rangeMax.toFixed(2)} m</span>
+            </div>
+            <div className="gps-row">
+              <span className="gps-label">Frame</span>
+              <span className="gps-val">{scan.frameId}</span>
             </div>
           </>
         ) : (

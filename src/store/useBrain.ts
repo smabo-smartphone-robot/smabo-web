@@ -4,7 +4,7 @@ import { browserName } from '../ws/auth';
 import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
 import type { ConnStatus, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
-import { deepMerge, type GpsState, type ImuState, type OdomState } from './convert';
+import { deepMerge, type GpsState, type ImuState, type OdomState, type ScanState, type WheelState } from './convert';
 import { pendingPing, registerBrainHandlers } from './brainHandlers';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
@@ -31,11 +31,13 @@ export interface BrainStore {
 
   // Drive
   odom: OdomState | null;
+  wheel: WheelState | null;
   trail: { x: number; y: number }[];
 
   // Sensors
   imu: ImuState | null;
   gps: GpsState | null;
+  scan: ScanState | null;      // the latest lidar revolution (/scan)
   webrtcStream: MediaStream | null;
   previewOn: boolean;          // brain→web 映像中継を要求しているか
 
@@ -95,6 +97,7 @@ export interface BrainStore {
   pingEsp32Ws(): void;
   clearRecognized(): void;
   clearTrail(): void;
+  resetWheel(): void;
   setVisionConfig(patch: Record<string, unknown>): void;
   setPreview(on: boolean): void;
   addLog(entry: Omit<LogEntry, 'id'>): void;
@@ -137,10 +140,12 @@ export const useBrain = create<BrainStore>((set, get) => {
     msgRate: 0,
 
     odom: null,
+    wheel: null,
     trail: [],
 
     imu: null,
     gps: null,
+    scan: null,
     webrtcStream: null,
     previewOn: false,
 
@@ -267,6 +272,7 @@ export const useBrain = create<BrainStore>((set, get) => {
     clearRecognized: () => set({ recognized: [] }),
 
     clearTrail: () => set({ trail: [] }),
+    resetWheel: () => set({ wheel: null }),
 
     setVisionConfig: (patch) => {
       // 部分設定を /vision/config（std_msgs/String の data に JSON）で送る。

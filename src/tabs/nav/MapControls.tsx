@@ -33,8 +33,11 @@ function savedAt(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
 }
 
-export function MapControls({ rosStatus }: { rosStatus: ConnStatus }) {
-  const [state, setState] = useState<NavState | null>(null);
+/** `active`: the Navigation mode is running (nav_manager is part of it; its last
+ *  /nav/state stays latched after it stops, so it is ignored otherwise). */
+export function MapControls({ rosStatus, active }: { rosStatus: ConnStatus; active: boolean }) {
+  const [latest, setState] = useState<NavState | null>(null);
+  const state = active ? latest : null;
   const [name, setName] = useState(defaultName);
   const [pick, setPick] = useState('');
 
@@ -63,8 +66,11 @@ export function MapControls({ rosStatus }: { rosStatus: ConnStatus }) {
   return (
     <>
       <div className="card-title">Map (SLAM → save → navigate)</div>
-      {rosStatus === 'connected' && !state && (
-        <div className="nav-hint">Waiting for nav_manager (/nav/state)… It runs with smabo-brain-ros bringup.</div>
+      {rosStatus === 'connected' && !active && (
+        <div className="nav-hint">Start Navigation above to build or use a map.</div>
+      )}
+      {rosStatus === 'connected' && active && !state && (
+        <div className="nav-hint">Waiting for nav_manager (/nav/state)…</div>
       )}
       {state && (
         <div className="nav-status">
@@ -76,7 +82,7 @@ export function MapControls({ rosStatus }: { rosStatus: ConnStatus }) {
       <div className="nav-step">1. Build a map</div>
       <div className="nav-row">
         <button onClick={() => send({ op: 'mapping' })} disabled={!ready}
-          title="Start slam_toolbox with an empty map, then drive smabo around (Drive tab)">
+          title="Start SLAM (Cartographer) with an empty map, then drive smabo around (Drive tab)">
           {mapping ? 'Restart SLAM' : 'Start SLAM'}
         </button>
         <span className="nav-hint">then drive around with the Drive tab</span>

@@ -6,8 +6,9 @@ import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
 import type {
   ConnStatus, Detection2DArrayMsg, GpsMsg, ImuMsg, OdomMsg, RosbridgeMsg, StringMsg, VisionConfigMsg,
+  LaserScanMsg, WheelVelMsg,
 } from '../ws/types';
-import { gpsFromMsg, imuFromMsg, odomFromMsg } from './convert';
+import { addWheelVel, gpsFromMsg, imuFromMsg, odomFromMsg, scanFromMsg } from './convert';
 import type { BrainStore } from './useBrain';
 import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
 
@@ -33,7 +34,11 @@ export const pendingPing: {
   current: { token: string; sentAt: number; timer: ReturnType<typeof setTimeout> } | null;
 } = { current: null };
 
+// /hello client names → the notice sources the toasts use (smabo-brain-ros)
+const HELLO_SOURCE: Record<string, 'esp32' | 'app'> = { 'smabo-esp32': 'esp32', 'smabo-app': 'app' };
+
 export function registerBrainHandlers(set: Set, get: Get): void {
+  let helloSubscribed = false;
   let msgCount = 0;
   let esp32DisconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let appDisconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,6 +69,18 @@ export function registerBrainHandlers(set: Set, get: Get): void {
       case '/odom': {
         const odom = odomFromMsg(raw as OdomMsg);
         set(s => ({ odom, trail: [...s.trail, { x: odom.x, y: odom.y }].slice(-TRAIL_MAX) }));
+        break;
+      }
+      case '/wheel_vel': {
+        // the ESP32's wheel speeds; revolutions use the wheel radius from its config
+        const dc = (get().esp32Config?.['dc'] ?? {}) as Record<string, unknown>;
+        const radius = typeof dc['wheel_radius'] === 'number' ? dc['wheel_radius'] : 0.03;
+        set(s => ({ wheel: addWheelVel(s.wheel, raw as WheelVelMsg, radius) }));
+        break;
+      }
+      case '/scan': {
+        // the lidar (ESP32 → brain → web), drawn in the Sensors tab
+        set(s => ({ scan: scanFromMsg(raw as LaserScanMsg, (s.scan?.count ?? 0) + 1) }));
         break;
       }
       case '/pong': {
@@ -166,11 +183,33 @@ export function registerBrainHandlers(set: Set, get: Get): void {
             get().refreshConfigQuietly();
             if (get().phoneHost) get().refreshPhoneConfig();
           }
+          // smabo-brain-ros sends no connection notices: learn of the ESP32 / app
+          // from the /hello each of them publishes when it connects
+          if (brainInfo.brain === 'smabo-brain-ros' && !helloSubscribed) {
+            helloSubscribed = true;
+            brain.send({ op: 'subscribe', topic: '/hello', type: 'std_msgs/msg/String' });
+          }
           setProtocolWarning('brain', brainInfo.protocol === PROTOCOL_VERSION ? null
             : `${brainInfo.brain} ${brainInfo.version} speaks protocol ${brainInfo.protocol}; `
               + `this smabo-web ${WEB_VERSION} speaks ${PROTOCOL_VERSION}. Update the older one.`);
         } catch {
           // ignore malformed info
+        }
+        break;
+      }
+      case '/hello': {
+        // smabo-brain-ros only (see /brain/info): a client said hello on connecting
+        try {
+          const h = JSON.parse((raw as StringMsg).data) as Record<string, unknown>;
+          const source = HELLO_SOURCE[String(h['client'])];
+          if (!source) break;
+          onNotice({
+            source, event: 'hello', ok: h['protocol'] === PROTOCOL_VERSION,
+            client: h['client'], version: h['version'], protocol: h['protocol'], expected: PROTOCOL_VERSION,
+          });
+          onNotice({ source, event: 'connected' });
+        } catch {
+          // ignore malformed hello
         }
         break;
       }
@@ -256,6 +295,7 @@ export function registerBrainHandlers(set: Set, get: Get): void {
   // ── connection status ────────────────────────────────────────
   let wasConnected = false;
   brain.onStatus((s: ConnStatus) => {
+    helloSubscribed = false;   // a new connection subscribes again once /brain/info says who it is
     set({ status: s, brainAuth: brain.auth, brainRefusal: brain.refusal });
     if (s === 'connected') {
       wasConnected = true;

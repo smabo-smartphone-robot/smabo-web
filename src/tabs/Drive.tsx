@@ -16,6 +16,8 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const odom = useBrain(s => s.odom);
   const trail = useBrain(s => s.trail);
   const clearTrail = useBrain(s => s.clearTrail);
+  const wheel = useBrain(s => s.wheel);
+  const resetWheel = useBrain(s => s.resetWheel);
   const visionConfig = useBrain(s => s.visionConfig);
   const visionDriveActive = !!(
     visionConfig?.enabled &&
@@ -84,6 +86,29 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
             <div className="telem-row">
               <span className="telem-label">θ</span>
               <span className="telem-val">{odom ? fmt(odom.th, 1) : '--'} °</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Wheels /wheel_vel</span>
+              <button onClick={resetWheel} style={{ fontSize: '.7rem', padding: '2px 8px' }}>Reset</button>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">L</span>
+              <span className="telem-val">{wheel ? fmt(wheel.left) : '--'} m/s</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">R</span>
+              <span className="telem-val">{wheel ? fmt(wheel.right) : '--'} m/s</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">L rev</span>
+              <span className="telem-val">{wheel ? fmt(wheel.revLeft, 2) : '--'}</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">R rev</span>
+              <span className="telem-val">{wheel ? fmt(wheel.revRight, 2) : '--'}</span>
             </div>
           </div>
 

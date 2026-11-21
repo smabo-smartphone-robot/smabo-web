@@ -23,6 +23,8 @@ export const PUBLISH: Record<string, string> = {
 /** Canonical topics read from the brain. */
 export const SUBSCRIBE: Record<string, string> = {
   '/odom':              'nav_msgs/msg/Odometry',
+  '/wheel_vel':         'smabo_interfaces/msg/WheelVel',
+  '/scan':              'sensor_msgs/msg/LaserScan',
   '/pong':              'std_msgs/msg/String',
   '/speech/recognized': 'std_msgs/msg/String',
   '/imu/data':          'sensor_msgs/msg/Imu',

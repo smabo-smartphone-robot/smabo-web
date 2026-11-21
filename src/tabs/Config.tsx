@@ -7,6 +7,7 @@ import { PhoneSettings } from './config/PhoneSettings';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config/fields';
 import { RandomGroupSettings } from './config/RandomGroupSettings';
 import { ServoTable } from './config/ServoTable';
+import { driveModes, driveView } from './config/driveModes';
 
 
 // ── main ─────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ export function Config() {
 
   const patch = (p: Record<string, unknown>) => patchConfig(p);
   const sendMode = (m: Record<string, unknown>) => setMode(m);
+  const drive = driveView(modes);
 
   // Stage helpers for Advanced section
   type MergeSetFn = (prev: Record<string, unknown>) => Record<string, unknown>;
@@ -147,13 +149,14 @@ export function Config() {
             </div>
           </details>
 
-          {/* dc_drive */}
+          {/* dc_drive, with the encoders as an option (= encoder_drive on the ESP32):
+              the dc settings apply with or without them */}
           <details>
             <summary>
               <span style={{ flex: 1 }}>dc_drive</span>
-              <input type="checkbox" checked={b(modes['dc_drive'])}
+              <input type="checkbox" checked={drive.dc}
                 onClick={e => e.stopPropagation()}
-                onChange={e => sendMode({ ...modes, dc_drive: e.target.checked })} />
+                onChange={e => sendMode(driveModes(modes, e.target.checked, drive.encoder))} />
             </summary>
             <div className="config-section">
               <div style={fg2}>
@@ -176,18 +179,12 @@ export function Config() {
                 <span style={lbl}>invert_right</span>
                 <input type="checkbox" checked={b(dc['invert_right'])} onChange={e => patch({ dc: { invert_right: e.target.checked } })} />
               </div>
-            </div>
-          </details>
-
-          {/* encoder_drive */}
-          <details>
-            <summary>
-              <span style={{ flex: 1 }}>encoder_drive</span>
-              <input type="checkbox" checked={b(modes['encoder_drive'])}
-                onClick={e => e.stopPropagation()}
-                onChange={e => sendMode({ ...modes, encoder_drive: e.target.checked })} />
-            </summary>
-            <div className="config-section">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 8px',
+                opacity: drive.dc ? 1 : 0.5 }}>
+                <input type="checkbox" checked={drive.encoder} disabled={!drive.dc}
+                  onChange={e => sendMode(driveModes(modes, true, e.target.checked))} />
+                encoder
+              </label>
               <div style={fg2}>
                 <span style={lbl}>cpr (counts/rev)</span>
                 <InlineNum value={n(enc['cpr'], 1320)} isInt w={60} onChange={v => patch({ encoder: { cpr: v } })} />
@@ -248,6 +245,11 @@ export function Config() {
                 <InlineNum value={n(lidar['range_min'], 0.05)} w={60} onChange={v => patch({ lidar: { range_min: v } })} />
                 <span style={lbl}>range_max (m)</span>
                 <InlineNum value={n(lidar['range_max'], 12.0)} w={60} onChange={v => patch({ lidar: { range_max: v } })} />
+                <span style={lbl}>angle_offset (deg)</span>
+                <InlineNum value={n(lidar['angle_offset'], 0)} w={60} onChange={v => patch({ lidar: { angle_offset: v } })} />
+                <span style={lbl}>clockwise</span>
+                <input type="checkbox" checked={b(lidar['clockwise'], true)}
+                  onChange={e => patch({ lidar: { clockwise: e.target.checked } })} />
               </div>
             </div>
           </details>
