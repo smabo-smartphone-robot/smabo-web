@@ -1,5 +1,10 @@
 # smabo-web
 
+> **smabo（スマボ）** は、手のひらサイズのスマホロボット（スマートフォンロボット）です。手持ちのスマホが顔とセンサーになり、工具なしでブロックのように組み立てられます。
+> このリポジトリは smabo の操作・可視化用 web アプリ（React）です。使い方は [製作ガイド](https://smabo-smartphone-robot.github.io/guides/smabo-web/)、ほかのリポジトリは [smabo-smartphone-robot](https://github.com/smabo-smartphone-robot) を見てください。
+>
+> *smabo is a palm-sized smartphone robot: your phone becomes its face and sensors, and it snaps together without tools. This repository is the browser app for control and visualization (React). Guides: [smabo-smartphone-robot.github.io](https://smabo-smartphone-robot.github.io/)*
+
 smabo ロボットの操作・可視化用 web フロントエンド。
 
 中継サーバ **smabo-brain**（または ROS 2 版の **smabo-brain-ros**）に WebSocket クライアントとして接続し、
