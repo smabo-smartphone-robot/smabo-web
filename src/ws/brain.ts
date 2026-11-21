@@ -1,9 +1,36 @@
 import type { ConnStatus, RosbridgeMsg } from './types';
+import { PROTOCOL_VERSION, WEB_VERSION } from '../version';
+import { PUBLISH, SUBSCRIBE } from './protocol.gen';
+import { clearToken, loadToken, saveToken } from './auth';
 
 type MsgHandler = (msg: RosbridgeMsg) => void;
 type StatusHandler = (s: ConnStatus) => void;
 
 const RECONNECT_DELAY_MS = 3000;
+// while refused (pairing screen): check again now and then, quietly, so a brain
+// restarted without pairing (or smabo-brain-ros) is picked up without a reload
+const UNPAIRED_RETRY_MS = 5000;
+// A brain without --pairing (the default) and smabo-brain-ros does not answer the token
+const AUTH_REPLY_TIMEOUT_MS = 1500;
+
+/** Who the brain says we are, after it accepted our token. */
+export interface BrainAuth { role: string; name: string; id: string }
+/** Why the brain refused us (shown on the pairing screen). */
+export interface BrainRefusal { reason: string; message: string }
+
+// smabo-brain and smabo-brain-ros (rosbridge_suite) both serve ws://host/ and
+// take the same handshake: advertise what we publish, subscribe to what we
+// read, then publish with the '/web' source prefix. So the web needs no
+// setting for which brain is running. The tables are generated from
+// smabo-protocol (protocol.gen.ts).
+const ROSBRIDGE_PUBLISH = PUBLISH;
+const ROSBRIDGE_SUBSCRIBE = SUBSCRIBE;
+
+// Pairing (smabo-brain): the first frame is our token ({op:'auth'}, empty
+// without one) or a code ({op:'pair'}); the brain answers with the same op.
+// Refused → status 'unpaired' and the pairing screen. No reconnect loop, but
+// a quiet re-check every UNPAIRED_RETRY_MS: the status stays 'unpaired' until
+// the brain accepts us (it was restarted without pairing, or it is brain-ros).
 
 class BrainClient {
   private ws: WebSocket | null = null;
@@ -13,6 +40,18 @@ class BrainClient {
   private _host = '';
   private _shouldReconnect = false;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _authTimer: ReturnType<typeof setTimeout> | null = null;
+  private _pendingPair: { code: string; name: string } | null = null;
+  private _ready = false;
+  /** Re-check a brain that refused us (until pair() / connect() / disconnect()). */
+  private _recheck = false;
+  /** Set once the brain accepted our token; null with a brain that has no pairing. */
+  auth: BrainAuth | null = null;
+  refusal: BrainRefusal | null = null;
+
+  get host(): string { return this._host; }
+  /** This browser's token for the current brain (Bearer for the brain's HTTP API). */
+  get token(): string | null { return this._host ? loadToken(this._host) : null; }
 
   get isConnected(): boolean {
     return this._status === 'connected';
@@ -23,47 +62,150 @@ class BrainClient {
     if (this._shouldReconnect && this._host === host) return;
     if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
     if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
+    this._recheck = false;
     this._host = host;
     this._shouldReconnect = true;
     this._doConnect();
   }
 
   private _doConnect(): void {
-    this._setStatus('connecting');
-    const url = `ws://${this._host}/ui`;
+    // a quiet re-check keeps the pairing screen up instead of flashing "connecting"
+    if (!this._recheck) this._setStatus('connecting');
+    const url = `ws://${this._host}/`;
 
     try {
       this.ws = new WebSocket(url);
     } catch {
+      if (this._recheck) { this._scheduleRecheck(); return; }
       this._setStatus('error');
       this._scheduleReconnect();
       return;
     }
 
+    this._ready = false;
     this.ws.onopen = () => {
-      this._setStatus('connected');
+      const pair = this._pendingPair;
+      const token = loadToken(this._host);
+      // Always ask first, even without a token: a brain with pairing refuses at
+      // once (pairing screen), smabo-brain without --pairing (the default) accepts, and one that does
+      // not know auth (smabo-brain-ros) says nothing until the timeout.
+      if (pair) {
+        this.send({ op: 'pair', code: pair.code, name: pair.name, role: 'web' });
+      } else {
+        this.send({ op: 'auth', token: token ?? '' });
+      }
+      this._authTimer = setTimeout(() => this._onReady(), AUTH_REPLY_TIMEOUT_MS);
     };
 
     this.ws.onmessage = (ev: MessageEvent) => {
+      let msg: RosbridgeMsg;
       try {
-        const msg = JSON.parse(ev.data as string) as RosbridgeMsg;
-        this.msgHandlers.forEach(h => h(msg));
+        msg = JSON.parse(ev.data as string) as RosbridgeMsg;
       } catch {
-        // ignore parse errors
+        return;
       }
+      if (msg.op === 'auth' || msg.op === 'pair') {
+        this._onAuthReply(msg as unknown as Record<string, unknown>);
+        return;
+      }
+      this.msgHandlers.forEach(h => h(msg));
     };
 
     this.ws.onerror = () => {
-      this._setStatus('error');
+      if (!this._recheck) this._setStatus('error');   // a failed re-check stays on the pairing screen
     };
 
     this.ws.onclose = () => {
+      this.ws = null;
+      this._clearAuthTimer();
+      if (this._recheck) {                        // wait for a code; re-check quietly
+        this._scheduleRecheck();
+        return;
+      }
       if (this._status !== 'error') {
         this._setStatus('disconnected');
       }
-      this.ws = null;
       this._scheduleReconnect();
     };
+  }
+
+  private _clearAuthTimer(): void {
+    if (this._authTimer) { clearTimeout(this._authTimer); this._authTimer = null; }
+  }
+
+  /** The brain accepted us (or did not ask): handshake and show as connected. */
+  private _onReady(): void {
+    this._clearAuthTimer();
+    if (this._ready) return;
+    this._ready = true;
+    if (this._recheck) {               // a re-check got in: back to normal reconnects
+      this._recheck = false;
+      this._shouldReconnect = true;
+      this.refusal = null;
+    }
+    this._handshake();
+    this._setStatus('connected');
+  }
+
+  private _onAuthReply(m: Record<string, unknown>): void {
+    this._clearAuthTimer();
+    const host = this._host;
+    if (m['ok'] === true) {
+      if (m['op'] === 'pair' && typeof m['token'] === 'string') saveToken(host, m['token']);
+      this._pendingPair = null;
+      this.refusal = null;
+      this.auth = { role: String(m['role'] ?? ''), name: String(m['name'] ?? ''), id: String(m['id'] ?? '') };
+      this._onReady();
+      return;
+    }
+    const reason = String(m['reason'] ?? 'unauthorized');
+    if (m['op'] === 'auth' && reason === 'unauthorized') clearToken(host);   // the brain forgot us
+    const recheck = this._recheck && this._status === 'unpaired';
+    this._pendingPair = null;
+    this.auth = null;
+    // a re-check refused again keeps what the screen says (e.g. "wrong code")
+    if (!recheck) this.refusal = { reason, message: String(m['message'] ?? '') };
+    this._shouldReconnect = false;
+    this._recheck = true;
+    this.ws?.close();
+    this._ready = false;
+    this._setStatus('unpaired');
+  }
+
+  /** Pair with a code from the brain's log or from an already paired browser. */
+  pair(host: string, code: string, name: string): void {
+    this._pendingPair = { code, name };
+    this.refusal = null;
+    this._shouldReconnect = false;   // let connect() start afresh
+    this.connect(host);
+  }
+
+  /** Forget this browser's token for the current brain (it must pair again). */
+  forget(): void {
+    if (this._host) clearToken(this._host);
+    this.auth = null;
+  }
+
+  /** Announce what we publish, subscribe to what we read, then say which
+   *  protocol we speak (the brain answers on /brain/info). */
+  private _handshake(): void {
+    for (const [topic, type] of Object.entries(ROSBRIDGE_PUBLISH)) {
+      this.send({ op: 'advertise', topic: `/web${topic}`, type });
+    }
+    for (const [topic, type] of Object.entries(ROSBRIDGE_SUBSCRIBE)) {
+      this.send({ op: 'subscribe', topic, type, throttle_rate: topic === '/odom' ? 50 : 0 });
+    }
+    this.publish('/hello', {
+      data: JSON.stringify({ protocol: PROTOCOL_VERSION, client: 'smabo-web', version: WEB_VERSION }),
+    });
+  }
+
+  private _scheduleRecheck(): void {
+    if (!this._recheck) return;
+    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = setTimeout(() => {
+      if (this._recheck) this._doConnect();
+    }, UNPAIRED_RETRY_MS);
   }
 
   private _scheduleReconnect(): void {
@@ -76,6 +218,8 @@ class BrainClient {
 
   disconnect(): void {
     this._shouldReconnect = false;
+    this._recheck = false;
+    this._clearAuthTimer();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
@@ -96,8 +240,18 @@ class BrainClient {
 
   publish(topic: string, msg: unknown): void {
     // 送信元を示す '/web' prefix を付ける。brain が剥がしてから
-    // canonical なトピック名で宛先デバイスに再配信する。
+    // 正式なトピック名で宛先に配信する。
     this.send({ op: 'publish', topic: `/web${topic}`, msg });
+  }
+
+  /** Take control from whoever drives (smabo-brain; see its control.py). */
+  claimControl(): void {
+    this.send({ op: 'control', action: 'claim' });
+  }
+
+  /** Let go of control so another tab can drive. */
+  releaseControl(): void {
+    this.send({ op: 'control', action: 'release' });
   }
 
   onMsg(handler: MsgHandler): () => void {

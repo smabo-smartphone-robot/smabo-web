@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { brain } from '../ws/brain';
 import { Joystick } from '../components/Joystick';
+import { ControlBar, useControlLocked } from '../components/ControlBar';
 import { TrailMap } from '../components/TrailMap';
 import { useDragOrder } from '../hooks/useDragOrder';
 
 const DRIVE_PANELS = ['telem', 'joystick', 'trail'] as const;
 type DP = (typeof DRIVE_PANELS)[number];
 
-export function Drive() {
+export type DriveSection = DP;
+
+/** `sections` limits which columns are shown (all when omitted); used by layout templates. */
+export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const odom = useBrain(s => s.odom);
   const trail = useBrain(s => s.trail);
   const clearTrail = useBrain(s => s.clearTrail);
@@ -19,6 +23,7 @@ export function Drive() {
     visionConfig.behaviors.drive
   );
   const { sort, handleProps, dropProps } = useDragOrder('smabo-drive-order');
+  const controlLocked = useControlLocked();
 
   const [maxLin, setMaxLin] = useState(0.3);
   const [maxAng, setMaxAng] = useState(1.0);
@@ -44,7 +49,7 @@ export function Drive() {
   };
 
   const fmt = (v: number, d = 3) => v.toFixed(d);
-  const sorted = sort(DRIVE_PANELS) as DP[];
+  const sorted = (sort(DRIVE_PANELS) as DP[]).filter(k => !sections || sections.includes(k));
 
   function renderPanel(k: DP) {
     const drop = dropProps(k, DRIVE_PANELS);
@@ -126,6 +131,7 @@ export function Drive() {
     if (k === 'joystick') return (
       <div key="joystick" className="drive-col-joystick" {...drop}>
         <span className="drag-handle" {...hdl}>⠿</span>
+        <ControlBar />
         {visionDriveActive && (
           <div className="expr-hint" style={{ marginBottom: 8 }}>
             🟢 <b>Vision is controlling drive</b> (/cmd_vel). Disable "Drive follow" in the Vision tab to drive manually.
@@ -136,7 +142,7 @@ export function Drive() {
           maxAng={maxAng}
           onCmd={handleCmd}
           onStop={handleStop}
-          disabled={visionDriveActive}
+          disabled={visionDriveActive || controlLocked}
         />
       </div>
     );

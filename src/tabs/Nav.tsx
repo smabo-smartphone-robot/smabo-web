@@ -3,6 +3,8 @@ import { useBrain } from '../store/useBrain';
 import { rosClient } from '../ros/ros';
 import { createViewer3D, type Viewer3DHandle } from '../ros/viewer3d';
 import type { ConnStatus } from '../ws/types';
+import { useThemeColors } from '../theme';
+import { MapControls } from './nav/MapControls';
 
 function yawToQuat(yawDeg: number) {
   const h = (yawDeg * Math.PI / 180) / 2;
@@ -25,6 +27,9 @@ export function Nav() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<Viewer3DHandle | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
+  const colors = useThemeColors();
+  const colorsRef = useRef(colors);
+  colorsRef.current = colors;
 
   const [rosStatus, setRosStatus] = useState<ConnStatus>('disconnected');
   const [init, setInit] = useState({ x: 0, y: 0, yaw: 0 });
@@ -44,6 +49,8 @@ export function Nav() {
       showMap: true,
       showScan: true,
       showUrdf: true,
+      background: colorsRef.current.bg2,
+      gridColor: colorsRef.current.grid,
     }).then(h => {
       if (disposed) { h.dispose(); return; }
       handleRef.current = h;
@@ -54,6 +61,11 @@ export function Nav() {
       handleRef.current = null;
     };
   }, [rosStatus]);
+
+  // theme change → recolour the running viewer
+  useEffect(() => {
+    handleRef.current?.setColors(colors.bg2, colors.grid);
+  }, [colors]);
 
   const connect = () => rosClient.connect(host);
 
@@ -105,6 +117,8 @@ export function Nav() {
           <span className={`dot ${rosStatus}`} title={rosStatus} />
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
+
+        <MapControls rosStatus={rosStatus} />
 
         <div className="card-title">Initial Pose (/initialpose)</div>
         <div className="nav-row">

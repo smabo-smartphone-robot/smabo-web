@@ -1,33 +1,14 @@
 import { create } from 'zustand';
-import { brain } from '../ws/brain';
-import { esp32 } from '../ws/esp32';
+import { brain, type BrainAuth, type BrainRefusal } from '../ws/brain';
+import { browserName } from '../ws/auth';
+import { esp32, phone } from '../ws/esp32';
 import * as webrtc from '../rtc/webrtc';
-import type { ConnStatus, RosbridgeMsg, OdomMsg, ImuMsg, GpsMsg, StringMsg, Quat, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
+import type { ConnStatus, VisionConfigMsg, Detection2DArrayMsg } from '../ws/types';
+import { deepMerge, type GpsState, type ImuState, type OdomState } from './convert';
+import { pendingPing, registerBrainHandlers } from './brainHandlers';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
-
-function toEuler(q: Quat) {
-  const { x, y, z, w } = q;
-  const roll  = Math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y)) * 180 / Math.PI;
-  const pitch = Math.asin(Math.max(-1, Math.min(1, 2 * (w * y - z * x)))) * 180 / Math.PI;
-  const yaw   = Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)) * 180 / Math.PI;
-  return { roll, pitch, yaw };
-}
-
-function deepMerge(
-  base: Record<string, unknown>,
-  over: Record<string, unknown>
-): Record<string, unknown> {
-  const out = { ...base };
-  for (const [k, v] of Object.entries(over)) {
-    out[k] =
-      v && typeof v === 'object' && !Array.isArray(v) &&
-      out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])
-        ? deepMerge(out[k] as Record<string, unknown>, v as Record<string, unknown>)
-        : v;
-  }
-  return out;
-}
+const PHONE_HOST_KEY = 'smabo-phone-host';
 
 interface LogEntry {
   id: number;
@@ -42,23 +23,19 @@ interface Toast {
   type: '' | 'ok' | 'err';
 }
 
-interface BrainStore {
+export interface BrainStore {
   status: ConnStatus;
   host: string;
   esp32Host: string;
   msgRate: number;
 
   // Drive
-  odom: { vx: number; wz: number; x: number; y: number; th: number } | null;
+  odom: OdomState | null;
   trail: { x: number; y: number }[];
 
   // Sensors
-  imu: {
-    roll: number; pitch: number; yaw: number;
-    gx: number; gy: number; gz: number;
-    ax: number; ay: number; az: number;
-  } | null;
-  gps: { lat: number; lon: number; alt: number; accuracy: number | null } | null;
+  imu: ImuState | null;
+  gps: GpsState | null;
   webrtcStream: MediaStream | null;
   previewOn: boolean;          // brain→web 映像中継を要求しているか
 
@@ -72,10 +49,26 @@ interface BrainStore {
 
   // Config
   esp32Config: Record<string, unknown> | null;
+  /** smabo-app's (or smabo-sim's phone) settings, from its REST /config or /phone/config. */
+  phoneHost: string;
+  phoneConfig: Record<string, unknown> | null;
 
   // ESP32 ↔ brain 接続状態（notice で追跡）
   // null = 未確認（brain 接続直後など）、true/false = 確認済み
   esp32Connected: boolean | null;
+
+  // Protocol check (/brain/info and the brain's hello notices): who speaks a
+  // different protocol number than this smabo-web, keyed by 'brain' / 'app' / 'esp32'.
+  brainInfo: { brain: string; version: string; protocol: number; auth: boolean; relay: boolean; control?: boolean } | null;
+  // Who drives (smabo-brain's control notice): null when the brain does not
+  // do this (smabo-brain-ros, older brains) and every tab drives as before.
+  control: { holder: string | null; you: boolean } | null;
+  protocolWarnings: Record<string, string>;
+
+  // Pairing with the brain: who it says we are, or why it refused us
+  // (status 'unpaired' shows the pairing screen).
+  brainAuth: BrainAuth | null;
+  brainRefusal: BrainRefusal | null;
 
   // ESP32 通信確認
   esp32Ping: { ok: boolean; latencyMs: number; at: number } | null; // REST GET /config の結果（web↔ESP32）
@@ -93,7 +86,12 @@ interface BrainStore {
   autoConnect(): void;
   setEsp32Host(h: string): void;
   refreshConfig(): void;
+  /** Automatic load (startup): no error toast if the ESP32 is not reachable yet. */
+  refreshConfigQuietly(): void;
   pingEsp32(): void;
+  setPhoneHost(h: string): void;
+  refreshPhoneConfig(): void;
+  patchPhoneConfig(patch: Record<string, unknown>): void;
   pingEsp32Ws(): void;
   clearRecognized(): void;
   clearTrail(): void;
@@ -107,34 +105,14 @@ interface BrainStore {
   removeConfig(patch: Record<string, unknown>): void;
   setServoEnabled(name: string, enabled: boolean): void;
   setMode(modes: Record<string, unknown>): void;
+  /** Pair this browser with a code from the brain's log or an invite. */
+  pairBrowser(code: string, name?: string): void;
+  /** Forget this browser's token for the current brain. */
+  unpairBrowser(): void;
 }
 
-// WebRTC は store 生成時に一度だけ初期化する。
-// setStreamCallback は set() への参照が必要なので create() の中で呼ぶ。
-
-let msgCount = 0;
-
-// High-frequency topics with large payloads are excluded from the log.
-// Camera frames (~50 KB base64) would otherwise flood it and cause per-frame
-// JSON.stringify + Zustand state updates re-rendering the Log tab.
-const LOG_SKIP_TOPICS = new Set(['/vision/detections']);
-
-// Pending WS ping (application-level /ping → /pong echo). Closure state so it
-// survives across messages without bloating the store.
-let wsPing: { token: string; sentAt: number; timer: ReturnType<typeof setTimeout> } | null = null;
-
-// Pending esp32Connected=false update. The ESP32 ws_client.py waits 3 s before
-// reconnecting, so we allow up to 6 s before marking it disconnected.
-// Cancelled immediately if a "connected" notice arrives in the meantime.
-const ESP32_DISCONNECT_DEBOUNCE_MS = 6000;
-let esp32DisconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-// Pending "app disconnected" toast (minor debounce to smooth brief drops).
-const APP_DISCONNECT_DEBOUNCE_MS = 3000;
-let appDisconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
 export const useBrain = create<BrainStore>((set, get) => {
-  // WebRTC 初期化 — brain からの中継映像 stream を store に格納
+  // WebRTC 初期化（一度だけ）— brain からの中継映像 stream を store に格納
   webrtc.init(
     (topic, msg) => {
       brain.publish(topic, msg);
@@ -143,193 +121,14 @@ export const useBrain = create<BrainStore>((set, get) => {
     (stream) => set({ webrtcStream: stream }),
   );
 
-  // Register handlers once at module import time
-  brain.onMsg((msg: RosbridgeMsg) => {
-    msgCount++;
-
-    // Handle specific topics
-    if (msg.op === 'publish' && msg.topic) {
-      const topic = msg.topic;
-
-      if (topic === '/odom') {
-        const m = msg.msg as OdomMsg;
-        const pos = m.pose.pose.position;
-        const ori = m.pose.pose.orientation;
-        const euler = toEuler(ori);
-        const vx = m.twist.twist.linear.x;
-        const wz = m.twist.twist.angular.z;
-        const x = pos.x;
-        const y = pos.y;
-        const th = euler.yaw;
-
-        set(s => {
-          const newTrail = [...s.trail, { x, y }];
-          const trimmed = newTrail.length > 2000 ? newTrail.slice(newTrail.length - 2000) : newTrail;
-          return {
-            odom: { vx, wz, x, y, th },
-            trail: trimmed,
-          };
-        });
-      } else if (topic === '/pong') {
-        // ESP32 からの ping エコー。token が一致したら往復時間(RTT)を確定する。
-        const m = msg.msg as StringMsg;
-        if (wsPing && m?.data === wsPing.token) {
-          const latencyMs = Math.round(performance.now() - wsPing.sentAt);
-          clearTimeout(wsPing.timer);
-          wsPing = null;
-          set({ esp32WsPing: { ok: true, latencyMs, at: Date.now() } });
-        }
-      } else if (topic === '/speech/recognized') {
-        const m = msg.msg as StringMsg;
-        const text = typeof m?.data === 'string' ? m.data : '';
-        if (text) {
-          set(s => ({
-            recognized: [{ text, t: Date.now() }, ...s.recognized].slice(0, 50),
-          }));
-        }
-      } else if (topic === '/imu/data') {
-        const m = msg.msg as ImuMsg;
-        const euler = toEuler(m.orientation);
-        set({
-          imu: {
-            roll: euler.roll,
-            pitch: euler.pitch,
-            yaw: euler.yaw,
-            gx: m.angular_velocity.x,
-            gy: m.angular_velocity.y,
-            gz: m.angular_velocity.z,
-            ax: m.linear_acceleration.x,
-            ay: m.linear_acceleration.y,
-            az: m.linear_acceleration.z,
-          },
-        });
-      } else if (topic === '/gps/fix') {
-        const m = msg.msg as GpsMsg;
-        const cov0 = m.position_covariance[0];
-        const accuracy = (cov0 != null && cov0 >= 0) ? Math.sqrt(cov0) : null;
-        set({
-          gps: {
-            lat: m.latitude,
-            lon: m.longitude,
-            alt: m.altitude,
-            accuracy,
-          },
-        });
-      } else if (topic === '/vision/config') {
-        // brain が保持する画像処理設定のスナップショット（起動時初期値 or 直近の上書き）。
-        // data は JSON 文字列（std_msgs/String）。
-        const m = msg.msg as StringMsg;
-        try {
-          const cfg = JSON.parse(m.data) as VisionConfigMsg;
-          set({ visionConfig: cfg });
-        } catch {
-          // ignore malformed config
-        }
-      } else if (topic === '/vision/detections') {
-        set({ detections: msg.msg as Detection2DArrayMsg });
-      } else if (topic === '/vision/markers') {
-        const m = msg.msg as StringMsg;
-        const text = typeof m?.data === 'string' ? m.data : '';
-        if (text) set({ visionMarkers: { text, t: Date.now() } });
-      } else if (topic === '/webrtc/web_offer') {
-        // brain が中継映像を offer してきた → answer を返す
-        const m = msg.msg as StringMsg;
-        if (m?.data) webrtc.handleBrainOffer(m.data);
-      }
-    }
-
-    // Connection notices from brain (app / esp32 connect・disconnect)
-    if (msg.op === 'notice') {
-      const n = msg as unknown as Record<string, unknown>;
-      if (n['source'] && n['event']) {
-        const source = n['source'] as string;
-        const ev     = n['event'] === 'connected' ? 'connected' : 'disconnected';
-
-        if (source === 'esp32') {
-          // ESP32 state is tracked in the store (not via toasts) so the Arm tab
-          // can show a persistent indicator without spurious flashes on reconnect.
-          if (ev === 'disconnected') {
-            esp32DisconnectTimer = setTimeout(() => {
-              esp32DisconnectTimer = null;
-              set({ esp32Connected: false });
-            }, ESP32_DISCONNECT_DEBOUNCE_MS);
-          } else {
-            if (esp32DisconnectTimer !== null) {
-              clearTimeout(esp32DisconnectTimer);
-              esp32DisconnectTimer = null;
-            }
-            const was = get().esp32Connected;
-            set({ esp32Connected: true });
-            // Toast when state changes: null (unknown) or false → true.
-            // Skipped only when already confirmed connected (was === true),
-            // which avoids duplicate toasts if the brain sends multiple notices.
-            if (was !== true) {
-              get().addToast('smabo-esp32 connected', 'ok');
-            }
-          }
-        } else {
-          // app (and any future sources): simple debounced toast
-          const label = 'smabo-app';
-          if (ev === 'disconnected') {
-            appDisconnectTimer = setTimeout(() => {
-              appDisconnectTimer = null;
-              get().addToast(`${label} disconnected`);
-            }, APP_DISCONNECT_DEBOUNCE_MS);
-          } else {
-            if (appDisconnectTimer !== null) {
-              clearTimeout(appDisconnectTimer);
-              appDisconnectTimer = null;
-            }
-            get().addToast(`${label} connected`, 'ok');
-          }
-        }
-      } else if (typeof n['message'] === 'string') {
-        get().addToast(n['message'] as string);
-      }
-      return;
-    }
-
-    // Add to log (skip high-frequency / large topics to avoid render overhead)
-    if (!msg.topic || !LOG_SKIP_TOPICS.has(msg.topic)) {
-      get().addLog({
-        type: 'recv',
-        text: JSON.stringify(msg),
-        topic: msg.topic,
-      });
-    }
-  });
-
-  let wasConnected = false;
-  brain.onStatus((s: ConnStatus) => {
-    set({ status: s });
-    if (s === 'connected') {
-      wasConnected = true;
-      get().addLog({ type: 'info', text: 'Brain connected' });
-      get().addToast('Brain connected', 'ok');
-    } else if (s === 'disconnected') {
-      get().addLog({ type: 'info', text: 'Brain disconnected' });
-      if (wasConnected) get().addToast('Brain disconnected');
-      wasConnected = false;
-      // Brain が切れたら ESP32 状態も不明に戻す。再接続時にスナップショットで確定する。
-      if (esp32DisconnectTimer !== null) {
-        clearTimeout(esp32DisconnectTimer);
-        esp32DisconnectTimer = null;
-      }
-      set({ previewOn: false, webrtcStream: null, esp32Connected: null });
-    } else if (s === 'error') {
-      if (wasConnected) get().addToast('Connection error', 'err');
-    }
-  });
-
-  // 1-second interval to update msgRate
-  setInterval(() => {
-    set({ msgRate: msgCount });
-    msgCount = 0;
-  }, 1000);
+  registerBrainHandlers(set, get);
 
   const initialEsp32Host =
     (typeof localStorage !== 'undefined' && localStorage.getItem(ESP32_HOST_KEY)) || 'smabo-esp32.local';
   esp32.setHost(initialEsp32Host);
+  const initialPhoneHost =
+    (typeof localStorage !== 'undefined' && localStorage.getItem(PHONE_HOST_KEY)) || '';
+  phone.setHost(initialPhoneHost);
 
   return {
     status: 'disconnected',
@@ -352,7 +151,14 @@ export const useBrain = create<BrainStore>((set, get) => {
     visionMarkers: null,
 
     esp32Config: null,
+    phoneHost: initialPhoneHost,
+    phoneConfig: null,
     esp32Connected: null,
+    brainInfo: null,
+    control: null,
+    protocolWarnings: {},
+    brainAuth: null,
+    brainRefusal: null,
 
     esp32Ping: null,
     esp32WsPing: null,
@@ -390,6 +196,41 @@ export const useBrain = create<BrainStore>((set, get) => {
         .catch(() => get().addToast('Failed to load config', 'err'));
     },
 
+    refreshConfigQuietly: () => {
+      esp32.getConfig()
+        .then(config => set({ esp32Config: config }))
+        .catch(() => {});
+    },
+
+    setPhoneHost: (h) => {
+      phone.setHost(h);
+      if (typeof localStorage !== 'undefined') localStorage.setItem(PHONE_HOST_KEY, h);
+      set({ phoneHost: h });
+    },
+
+    refreshPhoneConfig: () => {
+      if (!get().phoneHost) return;
+      phone.getConfig()
+        .then(config => set({ phoneConfig: config }))
+        .catch(() => get().addToast('Failed to load phone settings', 'err'));
+    },
+
+    patchPhoneConfig: (patch) => {
+      // 楽観的に即反映してからスマホへ直接 POST。結果は /phone/config でも届く
+      set(s => ({ phoneConfig: s.phoneConfig ? deepMerge(s.phoneConfig, patch) : s.phoneConfig }));
+      phone.setConfig(patch)
+        .then(ignored => {
+          if (ignored.length) {
+            get().addToast(`Phone ignored: ${ignored.join(', ')}`, 'err');
+            get().refreshPhoneConfig();
+          }
+        })
+        .catch(() => {
+          get().addToast('Failed to send phone settings', 'err');
+          get().refreshPhoneConfig();
+        });
+    },
+
     pingEsp32: () => {
       esp32.ping()
         .then(latencyMs => {
@@ -410,15 +251,15 @@ export const useBrain = create<BrainStore>((set, get) => {
         return;
       }
       const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      if (wsPing) clearTimeout(wsPing.timer);
+      if (pendingPing.current) clearTimeout(pendingPing.current.timer);
       const timer = setTimeout(() => {
-        if (wsPing && wsPing.token === token) {
-          wsPing = null;
+        if (pendingPing.current?.token === token) {
+          pendingPing.current = null;
           set({ esp32WsPing: { ok: false, latencyMs: -1, at: Date.now() } });
           get().addToast('ESP32 WS no response', 'err');
         }
       }, 2000);
-      wsPing = { token, sentAt: performance.now(), timer };
+      pendingPing.current = { token, sentAt: performance.now(), timer };
       brain.publish('/ping', { data: token });   // brain が /web prefix を付与
       get().addSentLog(`ping ${token}`);
     },
@@ -497,6 +338,16 @@ export const useBrain = create<BrainStore>((set, get) => {
       esp32.setConfig(patch)
         .then(() => get().refreshConfig())
         .catch(() => get().addToast('Failed to update servo', 'err'));
+    },
+
+    pairBrowser: (code, name) => {
+      brain.pair(get().host, code, name || browserName());
+    },
+
+    unpairBrowser: () => {
+      brain.forget();
+      brain.disconnect();
+      set({ brainAuth: null });
     },
 
     setMode: (modes) => {

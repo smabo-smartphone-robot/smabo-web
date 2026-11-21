@@ -12,7 +12,7 @@ function ImuBar({ value, max }: { value: number; max: number }) {
         style={{
           left: isPos ? '50%' : `${50 - pct}%`,
           width: `${pct}%`,
-          background: isPos ? 'var(--cyan)' : 'var(--orange)',
+          background: isPos ? 'var(--primary)' : 'var(--info)',
         }}
       />
     </div>
@@ -22,7 +22,10 @@ function ImuBar({ value, max }: { value: number; max: number }) {
 const SENSOR_KEYS = ['imu', 'gps', 'camera'] as const;
 type SK = (typeof SENSOR_KEYS)[number];
 
-export function Sensors() {
+export type SensorSection = SK;
+
+/** `sections` limits which cards are shown (all when omitted); used by layout templates. */
+export function Sensors({ sections }: { sections?: SensorSection[] } = {}) {
   const imu          = useBrain(s => s.imu);
   const gps          = useBrain(s => s.gps);
   const status       = useBrain(s => s.status);
@@ -37,7 +40,7 @@ export function Sensors() {
   }, [webrtcStream]);
 
   const fmt = (v: number, d = 2) => v.toFixed(d);
-  const sorted = sort(SENSOR_KEYS) as SK[];
+  const sorted = (sort(SENSOR_KEYS) as SK[]).filter(k => !sections || sections.includes(k));
 
   function renderCard(k: SK) {
     const drop = dropProps(k, SENSOR_KEYS);

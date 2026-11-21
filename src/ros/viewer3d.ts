@@ -15,11 +15,14 @@ export interface Viewer3DOptions {
   showScan?: boolean;       // LaserScan(/scan)
   showUrdf?: boolean;       // UrdfClient(/robot_description)
   background?: string;
+  gridColor?: string;
 }
 
 export interface Viewer3DHandle {
   tfClient: any;
   scene: any;
+  /** Re-colour for a theme change: background and grid. */
+  setColors(background: string, gridColor: string): void;
   dispose(): void;
 }
 
@@ -42,7 +45,16 @@ export async function createViewer3D(opts: Viewer3DOptions): Promise<Viewer3DHan
     cameraPose: { x: 1.5, y: 1.5, z: 1.5 },
   });
 
-  viewer.addObject(new ROS3D.Grid({ num_cells: 20, cellSize: 0.25, color: '#1e3a5f' }));
+  // follow the container (split panes can be resized at any time)
+  const ro = new ResizeObserver(() => {
+    const w = div.clientWidth, h = div.clientHeight;
+    if (w && h) { try { viewer.resize(w, h); } catch { /* ignore */ } }
+  });
+  ro.observe(div);
+
+  const makeGrid = (color: string) => new ROS3D.Grid({ num_cells: 20, cellSize: 0.25, color });
+  let grid = makeGrid(opts.gridColor ?? '#1e3a5f');
+  viewer.addObject(grid);
 
   // TF (needs tf2_web_republisher running on the ROS side).
   const tfClient = new ROSLIB.TFClient({
@@ -94,7 +106,16 @@ export async function createViewer3D(opts: Viewer3DOptions): Promise<Viewer3DHan
   return {
     tfClient,
     scene: viewer.scene,
+    setColors(background, gridColor) {
+      try {
+        viewer.renderer.setClearColor(background);
+        viewer.scene.remove(grid);
+        grid = makeGrid(gridColor);
+        viewer.addObject(grid);
+      } catch (e) { console.warn('viewer recolour failed', e); }
+    },
     dispose() {
+      ro.disconnect();
       try { tfClient.dispose?.(); } catch { /* ignore */ }
       try { viewer.stop?.(); } catch { /* ignore */ }
       // remove the canvas ros3d injected

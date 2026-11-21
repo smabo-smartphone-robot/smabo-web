@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>smabo-web UI案</title>
+<style>
+  /* page tokens + mock tokens. Mock tokens: dark = today's smabo-web (src/index.css), light = proposed light theme */
+  :root { color-scheme: light; --page: #f4f5f8; --ink: #1d2230; --sub: #5b6378; --line: #dde1ea; --card: #ffffff; --pill: #eef0f5; --good: #2e7d4f; --warn: #a15c00; --chip-bg: #e3f4ea; --chip-line: #b9e2c9; --chip-ink: #1f6b3e; --bg: #eef1f6; --bg2: #ffffff; --bg3: #e2e9f4; --accent: #d93a57; --cyan: #0092a3; --orange: #d97f00; --text: #1f2533; --dim: #6d7586; --green: #2f9e4a; --border: #cdd6e4; --frame-edge: #cfd6e2; --m-scene: #e6ecf5; --m-scene2: #f6f8fc; --m-grid: #cfd8e6; --m-grid2: #dbe2ec; --m-wall: #9fb1cc; --m-body: #c8d5ea; --m-body-edge: #7f97bf; --m-wheel: #dde5f1; --m-head: #aebfdc; --m-track: #dde3ee; --m-off: #c3c9d4; --m-tab: #e6ebf2; --m-ghost: #b7c2d4; --m-grip: #a3afc4; --m-lock-b: #b7c2d4; --m-lock-t: #7d8799; --m-sub: #5f6b82; --m-arrow: #8a95ad; --m-screen: #0f1830; --m-face: #0b0f1c; --m-eye: #e8e8e8; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; --page: #0e1018; --ink: #e6e8ef; --sub: #9aa2b6; --line: #262b3a; --card: #151926; --pill: #1d2232; --good: #7fd19b; --warn: #ffb64d; --chip-bg: #16301f; --chip-line: #2a5a3a; --chip-ink: #8fdcaa; --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --accent: #e94560; --cyan: #00bcd4; --orange: #ffa726; --text: #e0e0e0; --dim: #888; --green: #4caf50; --border: #1e3a5f; --frame-edge: #2a2f4a; --m-scene: #10182b; --m-scene2: #1c2a4a; --m-grid: #26365c; --m-grid2: #1f2b47; --m-wall: #3d5a8a; --m-body: #2b3f66; --m-body-edge: #4d6aa0; --m-wheel: #1a2540; --m-head: #3a4f7c; --m-track: #24304d; --m-off: #444; --m-tab: #1b2440; --m-ghost: #3a4a70; --m-grip: #4c5a80; --m-lock-b: #34446a; --m-lock-t: #5d6886; --m-sub: #9aa3b8; --m-arrow: #7f8aa8; }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; --page: #0e1018; --ink: #e6e8ef; --sub: #9aa2b6; --line: #262b3a; --card: #151926; --pill: #1d2232; --good: #7fd19b; --warn: #ffb64d; --chip-bg: #16301f; --chip-line: #2a5a3a; --chip-ink: #8fdcaa; --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --accent: #e94560; --cyan: #00bcd4; --orange: #ffa726; --text: #e0e0e0; --dim: #888; --green: #4caf50; --border: #1e3a5f; --frame-edge: #2a2f4a; --m-scene: #10182b; --m-scene2: #1c2a4a; --m-grid: #26365c; --m-grid2: #1f2b47; --m-wall: #3d5a8a; --m-body: #2b3f66; --m-body-edge: #4d6aa0; --m-wheel: #1a2540; --m-head: #3a4f7c; --m-track: #24304d; --m-off: #444; --m-tab: #1b2440; --m-ghost: #3a4a70; --m-grip: #4c5a80; --m-lock-b: #34446a; --m-lock-t: #5d6886; --m-sub: #9aa3b8; --m-arrow: #7f8aa8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.7 "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 28px; line-height: 1.3; margin: 0 0 8px; letter-spacing: .01em; }
+  h2 { font-size: 21px; margin: 0; line-height: 1.35; }
+  h3 { font-size: 15px; margin: 18px 0 6px; color: var(--sub); font-weight: 600; }
+  p { margin: 6px 0; }
+  .lead { color: var(--sub); max-width: 760px; }
+  .lead a { color: var(--ink); text-decoration-color: var(--sub); }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 8px; }
+  nav.toc a { text-decoration: none; color: var(--ink); background: var(--pill);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+  section.concept { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px; margin-top: 28px; }
+  .head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .tag { font: 600 12px/1 system-ui, sans-serif; letter-spacing: .06em; padding: 5px 9px;
+    border-radius: 6px; background: var(--ink); color: var(--card); }
+  .rec { background: var(--accent); color: #fff; }
+  .one { color: var(--sub); margin: 4px 0 16px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+  .cols ul { margin: 0; padding-left: 1.2em; }
+  .cols li { margin: 2px 0; }
+  .pro h3 { color: var(--good); } .con h3 { color: var(--warn); }
+  .caption { font-size: 13px; color: var(--sub); margin-top: 8px; }
+  .callouts { counter-reset: c; list-style: none; padding: 0; margin: 12px 0 0; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; font-size: 14px; }
+  .callouts li { display: flex; gap: 8px; }
+  .callouts b.n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent);
+    color: #fff; font: 700 11px/20px system-ui; text-align: center; margin-top: 3px; }
+
+  /* ---------- mock-up kit (smabo-web look) ---------- */
+  .frame { background: var(--bg); color: var(--text); border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--frame-edge); font: 11px/1.4 ui-monospace, Menlo, monospace; position: relative;
+    aspect-ratio: 16 / 9.4; display: grid; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--bg2);
+    border-bottom: 1px solid var(--border); min-height: 30px; white-space: nowrap; overflow: hidden; }
+  .logo { color: var(--accent); font-weight: 700; }
+  .lamp { display: inline-flex; align-items: center; gap: 4px; color: var(--dim); }
+  .lamp::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 6px var(--green); }
+  .lamp.off::before { background: var(--m-off); box-shadow: none; }
+  .lamp.warn::before { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+  .sim { background: var(--orange); color: #222; border-radius: 4px; padding: 0 5px; font-weight: 700; }
+  .estop { margin-left: auto; background: var(--accent); color: #fff; border-radius: 5px; padding: 3px 9px;
+    font-weight: 700; box-shadow: 0 0 0 2px rgba(233,69,96,.35); }
+  .pnl { background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 7px;
+    overflow: hidden; position: relative; min-height: 0; }
+  .pt { color: var(--cyan); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 5px; }
+  .row { display: flex; justify-content: space-between; color: var(--dim); }
+  .row b { color: var(--text); font-weight: 400; }
+  .meter { height: 5px; background: var(--m-track); border-radius: 3px; margin: 4px 0 6px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--cyan); }
+  .btn { display: inline-block; border: 1px solid var(--border); background: var(--bg3); border-radius: 5px;
+    padding: 2px 7px; color: var(--text); margin: 2px 2px 0 0; }
+  .btn.on { border-color: var(--cyan); color: var(--cyan); }
+  .tog { display: flex; justify-content: space-between; align-items: center; color: var(--dim); margin: 3px 0; }
+  .tog::after { content: ""; width: 20px; height: 11px; border-radius: 6px; background: var(--green); }
+  .tog.off::after { background: var(--m-off); }
+  .cam { position: relative; border-radius: 7px; overflow: hidden; min-height: 0;
+    background:
+      linear-gradient(180deg, #c9ced8 0 38%, #9aa3b1 38% 40%, #b8bec9 40% 100%); }
+  .cam .wall { position: absolute; left: 38%; top: 18%; width: 30%; height: 30%; background: #a7afbc;
+    clip-path: polygon(0 20%, 100% 0, 100% 100%, 0 100%); }
+  .cam .wall.b { left: 8%; width: 22%; top: 22%; height: 22%; background: #b3bac6; clip-path: polygon(0 0, 100% 25%, 100% 100%, 0 100%); }
+  .cam .det { position: absolute; border: 1.5px solid var(--green); border-radius: 3px; }
+  .cam .det span { position: absolute; top: -13px; left: -1px; background: var(--green); color: #000; padding: 0 3px; font-size: 9px; }
+  .cam .live { position: absolute; top: 6px; left: 8px; background: rgba(0,0,0,.55); padding: 1px 6px; border-radius: 4px; }
+  .cam .live::before { content: "● "; color: var(--accent); }
+  .seg { position: absolute; top: 6px; right: 8px; display: flex; background: rgba(15,52,96,.85); border-radius: 5px; overflow: hidden; }
+  .seg span { padding: 2px 8px; color: var(--dim); }
+  .seg span.on { background: var(--cyan); color: #00262b; }
+  .map { position: relative; border-radius: 7px; overflow: hidden; background: var(--m-scene); min-height: 0; }
+  .map svg, .twin svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .joy { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--border);
+    background: radial-gradient(circle at 50% 50%, var(--bg3) 0 30%, transparent 31%); margin: 4px auto; position: relative; }
+  .joy::after { content: ""; position: absolute; width: 22px; height: 22px; border-radius: 50%; background: var(--cyan);
+    left: 50%; top: 32%; transform: translate(-50%, -50%); box-shadow: 0 0 8px var(--cyan); }
+  .log { color: var(--dim); font-size: 9.5px; line-height: 1.5; overflow: hidden; }
+  .log b { color: var(--green); font-weight: 400; } .log i { color: var(--orange); font-style: normal; }
+  .badge { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff;
+    font: 700 10px/18px system-ui; text-align: center; z-index: 5; box-shadow: 0 0 0 2px var(--bg); }
+  .face { display: flex; justify-content: center; gap: 12px; padding: 6px 0; }
+  .face i { width: 16px; height: 16px; border-radius: 50%; background: var(--m-eye); display: block; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 3px 8px; border-radius: 5px 5px 0 0; color: var(--dim); background: var(--m-tab); }
+  .tabs span.on { color: var(--accent); background: var(--bg2); border: 1px solid var(--border); border-bottom: none; }
+  .ghost { border: 1.5px dashed var(--m-ghost); border-radius: 7px; display: grid; place-items: center; color: var(--dim); }
+  .grip { position: absolute; top: 5px; right: 7px; color: var(--m-grip); letter-spacing: -1px; }
+
+  .cfg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .cfg3 h4 { margin: 0 0 6px; font-size: 14px; }
+  .cfg3 .frame { aspect-ratio: 4 / 3.6; font-size: 9px; }
+  .mod { display: inline-block; font: 600 11px/1.6 system-ui; border-radius: 4px; padding: 0 6px; margin: 0 3px 3px 0;
+    background: var(--pill); border: 1px solid var(--line); color: var(--sub); }
+  .mod.y { background: var(--chip-bg); border-color: var(--chip-line); color: var(--chip-ink); }
+  .lock { display: grid; place-items: center; text-align: center; color: var(--m-lock-t); border: 1.5px dashed var(--m-lock-b);
+    border-radius: 7px; font-size: 9px; padding: 4px; }
+  @media (max-width: 760px) { .cfg3 { grid-template-columns: 1fr; } }
+  pre.code { background: var(--bg); color: var(--text); border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+    font: 12.5px/1.6 ui-monospace, Menlo, monospace; margin: 10px 0 0; }
+  pre.code .k { color: var(--cyan); } pre.code .s { color: var(--orange); } pre.code .c { color: #6f7a99; }
+  .arch { width: 100%; height: auto; display: block; margin-top: 10px; }
+  .slot { outline: 1.5px dashed var(--accent); outline-offset: -2px; }
+  .stages { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 18px; margin-top: 16px; }
+  .stage-h { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+  .stage-h b { font-size: 15px; }
+  .snum { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--card);
+    font: 700 13px/26px system-ui; text-align: center; }
+  .stage .frame { font-size: 9px; }
+  ul.adds { margin: 8px 0 0; padding-left: 1.2em; font-size: 13.5px; }
+  .rmap { width: 100%; height: auto; display: block; margin-top: 12px; }
+  @media (max-width: 760px) { .stages { grid-template-columns: 1fr; } }
+  .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+  .phase-h { margin-top: 22px; }
+  .tcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--card); }
+  .tcard-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .tmeta { font-size: 12px; color: var(--sub); margin: 2px 0 8px; }
+  .tmeta code { font-size: 11px; background: var(--pill); border-radius: 4px; padding: 0 4px; }
+  .wip { font-size: 11px; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+  .thumb { display: grid; gap: 4px; padding: 4px; height: 128px; border-radius: 8px; background: var(--bg); border: 1px solid var(--frame-edge);
+    font: 10px/1.3 ui-monospace, Menlo, monospace; }
+  .tb { border-radius: 5px; padding: 4px 5px; color: var(--text); overflow: hidden; border: 1px solid var(--border); background: var(--bg2); }
+  .tb-m { background: var(--m-scene); border-color: var(--cyan); color: var(--cyan); }
+  .tb-m2 { background: var(--m-scene); }
+  .tb-c { background: var(--bg3); }
+  .tb-s { border-style: dashed; color: var(--orange); }
+  .tb-g { border-style: dashed; color: var(--dim); }
+  ul.tpanels { margin: 8px 0 0; padding-left: 1.1em; font-size: 13px; }
+  .tcfg { font-size: 12.5px; margin-top: 6px; color: var(--sub); }
+  .tcfg b { color: var(--warn); font-weight: 600; }
+  .tcfg ul { margin: 2px 0 0; padding-left: 1.1em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--sub); margin-top: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .lg-m::before { background: var(--cyan); } .lg-c::before { background: #2f5d9a; } .lg-s::before { border: 1.5px dashed var(--warn); }
+  .pkgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; min-height: 0; overflow: hidden; align-content: start; }
+  .pk { border: 1px solid var(--border); border-radius: 6px; padding: 5px; background: var(--bg); }
+  .pk.on { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+  .pk.off { opacity: .45; }
+  .pk-th { height: 34px; display: grid; grid-template-columns: 1.5fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; margin-bottom: 4px; }
+  .pk-th i { background: var(--bg3); border-radius: 2px; } .pk-th i:first-child { grid-row: span 2; background: var(--m-scene); }
+  .pk-n { color: var(--text); font-size: 9px; line-height: 1.25; } .pk-s { color: var(--dim); font-size: 8px; }
+  .pk.on .pk-s { color: var(--cyan); }
+  @media (max-width: 900px) { .tgrid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .tgrid { grid-template-columns: 1fr; } .pkgrid { grid-template-columns: repeat(3, 1fr); } }
+  .themebar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .themesw { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--card); }
+  .themesw button { border: 0; background: transparent; color: var(--sub); font: 13px/1 inherit; padding: 7px 12px; cursor: pointer; }
+  .themesw button.on { background: var(--ink); color: var(--card); }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+  .duo .frame { aspect-ratio: 16/10; }
+  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+  .th-dark { --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --accent: #e94560; --cyan: #00bcd4; --orange: #ffa726; --text: #e0e0e0; --dim: #888; --green: #4caf50; --border: #1e3a5f; --frame-edge: #2a2f4a; --m-scene: #10182b; --m-scene2: #1c2a4a; --m-grid: #26365c; --m-grid2: #1f2b47; --m-wall: #3d5a8a; --m-body: #2b3f66; --m-body-edge: #4d6aa0; --m-wheel: #1a2540; --m-head: #3a4f7c; --m-track: #24304d; --m-off: #444; --m-tab: #1b2440; --m-ghost: #3a4a70; --m-grip: #4c5a80; --m-lock-b: #34446a; --m-lock-t: #5d6886; --m-sub: #9aa3b8; --m-arrow: #7f8aa8; }
+  .th-light { --bg: #eef1f6; --bg2: #ffffff; --bg3: #e2e9f4; --accent: #d93a57; --cyan: #0092a3; --orange: #d97f00; --text: #1f2533; --dim: #6d7586; --green: #2f9e4a; --border: #cdd6e4; --frame-edge: #cfd6e2; --m-scene: #e6ecf5; --m-scene2: #f6f8fc; --m-grid: #cfd8e6; --m-grid2: #dbe2ec; --m-wall: #9fb1cc; --m-body: #c8d5ea; --m-body-edge: #7f97bf; --m-wheel: #dde5f1; --m-head: #aebfdc; --m-track: #dde3ee; --m-off: #c3c9d4; --m-tab: #e6ebf2; --m-ghost: #b7c2d4; --m-grip: #a3afc4; --m-lock-b: #b7c2d4; --m-lock-t: #7d8799; --m-sub: #5f6b82; --m-arrow: #8a95ad;  }
+  /* comparison table */
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
+  th { color: var(--sub); font-weight: 600; font-size: 13px; }
+  .dots { letter-spacing: 2px; color: var(--accent); white-space: nowrap; }
+  .dots s { color: var(--line); text-decoration: none; }
+  .tablewrap { overflow-x: auto; }
+
+  @media (max-width: 760px) {
+    .cols { grid-template-columns: 1fr; }
+    section.concept { padding: 16px; }
+    .frame { font-size: 8px; aspect-ratio: auto; min-height: 260px; }
+    h1 { font-size: 23px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="themebar"><h1>smabo-web UI 案</h1>
+    <div class="themesw" role="group" aria-label="表示テーマ"><button data-t="auto" class="on">自動</button><button data-t="light">☀ ライト</button><button data-t="dark">☾ ダーク</button></div></div>
+  <p class="lead">今の 9 タブ（Face / Sensors / two wheel mobile robot / Servo / Vision / Navigation / Motion Plan / Config / Log）を作り直すための 5 案と、それらを組み合わせたおすすめ案です。図はワイヤーフレームで、ダークは今の smabo-web の配色、ライトは新しく用意する配色です（右上で切り替え）。番号の付いた赤い丸は、下の説明と対応しています。<br>smabo は付いている部品が個体ごとに違う（スマホだけの構成もある）ので、どの案も「今つながっている部品に合わせて画面が変わる」ことを前提にしています（<a href="#config">構成に合わせる</a>）。また、機械学習などの機能をあとから足せる作りにします（<a href="#extend">機能を足せる作り</a>）。</p>
+  <nav class="toc">
+    <a href="#a">A コックピット</a><a href="#b">B デジタルツイン</a><a href="#c">C 目的別モード</a>
+    <a href="#d">D ダッシュボード</a><a href="#e">E タブレット</a><a href="#rec">おすすめ（A+B+C）</a><a href="#config">構成に合わせる</a><a href="#phone-only">スマホだけの画面</a><a href="#extend">機能を足せる作り</a><a href="#roadmap">ロードマップ順の画面</a><a href="#templates">ガイド別テンプレート</a><a href="#theme">ダーク／ライト</a>
+    <a href="#common">共通要素</a><a href="#compare">比較</a>
+  </nav>
+
+  <!-- ============================== A ============================== -->
+  <section class="concept" id="a">
+    <div class="head"><span class="tag">A</span><h2>コックピット型（1 画面）</h2></div>
+    <p class="one">走らせる・見る・反応させるを 1 画面で。ドローンの地上局ソフトのように、主役の映像を中央に大きく置きます。</p>
+    <div class="frame" style="grid-template-rows: 30px 1fr 54px;">
+      <div class="bar"><span class="logo">smabo</span>
+        <span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="sim">SIM</span>
+        <span style="color:var(--dim)">odom 50Hz · scan 10Hz · cam 10fps</span><span class="badge" style="position:static">1</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:grid; grid-template-columns: 20% 1fr 23%; gap: 7px; padding: 7px; min-height:0;">
+        <div class="pnl"><div class="pt">Robot</div>
+          <div class="row">x <b>+1.32</b></div><div class="row">y <b>-0.14</b></div><div class="row">yaw <b>-84°</b></div>
+          <div class="pt" style="margin-top:8px">Modes</div>
+          <div class="tog">servos</div><div class="tog">dc_drive</div><div class="tog off">encoder</div><div class="tog">lidar</div>
+          <div class="pt" style="margin-top:8px">IMU</div><div class="meter"><i style="width:62%"></i></div><div class="meter"><i style="width:35%"></i></div>
+        </div>
+        <div class="cam"><div class="wall"></div><div class="wall b"></div>
+          <div class="det" style="left:46%;top:46%;width:14%;height:26%"><span>person</span></div>
+          <span class="live">camera</span><div class="seg"><span class="on">カメラ</span><span>3D 地図</span></div>
+          <div class="map" style="position:absolute; right:8px; bottom:8px; width:26%; height:34%; border:1px solid var(--border);">
+            <svg viewBox="0 0 100 70"><rect x="8" y="8" width="84" height="54" fill="none" stroke="var(--m-wall)" stroke-width="2"/>
+              <rect x="55" y="30" width="16" height="10" fill="var(--m-wall)"/><path d="M25 50 Q40 30 62 22" stroke="var(--cyan)" fill="none" stroke-dasharray="3 2"/>
+              <circle cx="25" cy="50" r="3.5" fill="var(--accent)"/></svg></div>
+          <span class="badge" style="left:48%;top:8px">2</span><span class="badge" style="right:30%;bottom:38%">3</span>
+        </div>
+        <div class="pnl"><div class="pt">Drive</div><div class="joy"></div>
+          <div class="row">lin <b>0.12 m/s</b></div><div class="row">ang <b>0.30 rad/s</b></div>
+          <div class="pt" style="margin-top:6px">Face</div><div class="face"><i></i><i></i></div>
+          <span class="btn">😊</span><span class="btn">😴</span><span class="btn">😠</span><span class="btn">❤</span>
+          <span class="badge" style="right:6px;top:6px">4</span></div>
+      </div>
+      <div class="pnl" style="margin:0 7px 7px; border-radius:7px;"><div class="log">
+        <b>09:07:20</b> /speech/recognized 「止まって」 &nbsp; <b>09:07:21</b> /cmd_vel 0.00 0.00 &nbsp; <i>09:07:25</i> Nav2 goal accepted<br>
+        <b>09:07:26</b> /expression 4 &nbsp; <b>09:07:30</b> /speech/say 「こんにちは」</div>
+        <span class="badge" style="right:8px;top:6px">5</span></div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>常時表示のステータスバー。各部の接続ランプ、受信レート、緊急停止。</span></li>
+      <li><b class="n">2</b><span>メイン画面。カメラと 3D 地図を切り替え。検出枠は映像に重ねる。</span></li>
+      <li><b class="n">3</b><span>小さい地図を常に隅に表示（ピクチャー・イン・ピクチャー）。</span></li>
+      <li><b class="n">4</b><span>右パネルは操作。ジョイスティック、表情ボタンなどすぐ使うもの。</span></li>
+      <li><b class="n">5</b><span>下はタイムライン。発話・指令・Nav2 の出来事が流れる。</span></li>
+    </ol>
+    <div class="cols">
+      <div class="pro"><h3>良いところ</h3><ul><li>走らせながら映像・地図・顔を同時に見られる</li><li>画面遷移がほぼない</li><li>今の Drive / Sensors / Face の部品をそのまま使える</li></ul></div>
+      <div class="con"><h3>気になるところ</h3><ul><li>狭い画面だと詰まる</li><li>アームや MoveIt など細かい設定の居場所が必要</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============================== B ============================== -->
+  <section class="concept" id="b">
+    <div class="head"><span class="tag">B</span><h2>3D デジタルツイン中心</h2></div>
+    <p class="one">ロボットの 3D モデルが画面の主役。触りたい部位をクリックすると、その操作パネルが出ます。</p>
+    <div class="frame" style="grid-template-rows: 30px 1fr;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span>
+        <span style="color:var(--dim)">表示: ロボット ✓ 地図 ✓ スキャン ✓ 経路 ✓</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:grid; grid-template-columns: 1fr 30%; gap:7px; padding:7px; min-height:0;">
+        <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);">
+          <svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid meet">
+            <!-- floor grid in perspective -->
+            <g stroke="var(--m-grid)" stroke-width="1">
+              <path d="M40 210 L360 210 M70 180 L330 180 M95 155 L305 155 M115 135 L285 135"/>
+              <path d="M40 210 L115 135 M120 210 L160 135 M200 210 L200 135 M280 210 L240 135 M360 210 L285 135"/>
+            </g>
+            <!-- scan points -->
+            <g fill="var(--accent)"><circle cx="70" cy="170" r="1.6"/><circle cx="78" cy="160" r="1.6"/><circle cx="86" cy="151" r="1.6"/><circle cx="300" cy="150" r="1.6"/><circle cx="308" cy="160" r="1.6"/><circle cx="316" cy="171" r="1.6"/><circle cx="150" cy="138" r="1.6"/><circle cx="165" cy="137" r="1.6"/><circle cx="250" cy="137" r="1.6"/></g>
+            <path d="M200 190 Q235 165 270 145" stroke="var(--cyan)" stroke-width="2" fill="none" stroke-dasharray="5 4"/>
+            <!-- robot -->
+            <ellipse cx="200" cy="196" rx="46" ry="9" fill="#000" opacity=".35"/>
+            <rect x="160" y="150" width="80" height="40" rx="6" fill="var(--m-body)" stroke="var(--m-body-edge)"/>
+            <rect x="177" y="118" width="46" height="32" rx="4" fill="var(--m-screen)" stroke="var(--cyan)" stroke-width="1.5"/>
+            <circle cx="192" cy="133" r="4" fill="var(--m-eye)"/><circle cx="208" cy="133" r="4" fill="var(--m-eye)"/>
+            <rect x="193" y="108" width="14" height="10" rx="3" fill="var(--m-head)"/>
+            <circle cx="166" cy="190" r="10" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/><circle cx="234" cy="190" r="10" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/>
+            <path d="M240 160 L268 140 L285 150" stroke="var(--orange)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="268" cy="140" r="4" fill="var(--orange)"/>
+            <!-- callout lines -->
+            <g stroke="var(--dim)" stroke-width="1" fill="none" stroke-dasharray="2 2">
+              <path d="M200 118 L150 70"/><path d="M276 145 L320 95"/><path d="M166 196 L110 215"/><path d="M200 108 L235 60"/></g>
+            <g font-size="11" fill="var(--text)" font-family="ui-monospace,monospace">
+              <text x="92" y="66">顔・視線</text><text x="300" y="90" fill="var(--orange)">アーム ▶</text><text x="58" y="222">車輪 → 走行</text><text x="238" y="56">LiDAR</text></g>
+          </svg>
+          <span class="badge" style="left:12px;top:10px">1</span><span class="badge" style="left:72%;top:30%">2</span>
+          <div class="seg" style="left:8px; right:auto; top:auto; bottom:8px;"><span class="on">追従</span><span>上から</span><span>自由</span></div>
+        </div>
+        <div class="pnl"><div class="pt">選択中: アーム</div>
+          <div class="row">arm_joint_1 <b>12°</b></div><div class="meter"><i style="width:56%;background:var(--orange)"></i></div>
+          <div class="row">arm_joint_2 <b>-30°</b></div><div class="meter"><i style="width:33%;background:var(--orange)"></i></div>
+          <div class="row">arm_joint_3 <b>45°</b></div><div class="meter"><i style="width:75%;background:var(--orange)"></i></div>
+          <div class="row">arm_joint_4 <b>0°</b></div><div class="meter"><i style="width:50%;background:var(--orange)"></i></div>
+          <div class="pt" style="margin-top:6px">MoveIt</div><span class="btn on">Plan</span><span class="btn">Execute</span><span class="btn">Home</span>
+          <span class="badge" style="right:6px;top:6px">3</span></div>
+      </div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>URDF のメッシュで描いたロボット。地図・スキャン・経路も同じ 3D 空間に重ねる。</span></li>
+      <li><b class="n">2</b><span>部位をクリック（または触れる）と選択。今の関節角は実機の /joint_states で動く。</span></li>
+      <li><b class="n">3</b><span>選んだ部位の操作パネル。頭なら顔と視線、車輪なら走行、LiDAR ならスキャン設定。</span></li>
+    </ol>
+    <div class="cols">
+      <div class="pro"><h3>良いところ</h3><ul><li>どこを触れば何が動くかが直感的</li><li>デモ・説明で見栄えが良い</li><li>three.js / ros3d と smabo_description がもうある</li></ul></div>
+      <div class="con"><h3>気になるところ</h3><ul><li>3D 描画が重く、古い端末ではつらい</li><li>ログや数値を見る作業には向かない</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============================== C ============================== -->
+  <section class="concept" id="c">
+    <div class="head"><span class="tag">C</span><h2>目的別のモード</h2></div>
+    <p class="one">9 タブを「何をしたいか」で 4 つにまとめ、それぞれ専用の配置にします。下は「対話」モードの画面です。</p>
+    <div class="frame" style="grid-template-rows: 30px 34px 1fr;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:flex; align-items:flex-end; padding: 0 10px; gap: 6px; border-bottom:1px solid var(--border);">
+        <div class="tabs"><span>🕹 操縦</span><span class="on">💬 対話</span><span>🔧 調整</span><span>🩺 診断</span></div>
+        <span class="badge" style="position:static; margin:0 0 6px 8px">1</span></div>
+      <div style="display:grid; grid-template-columns: 34% 1fr 28%; gap:7px; padding:7px; min-height:0;">
+        <div class="pnl"><div class="pt">スマホの顔</div>
+          <div style="background:var(--m-face);border-radius:6px;padding:10px 0;margin-bottom:6px"><div class="face"><i></i><i></i></div>
+            <div style="text-align:center;color:var(--dim)">「こんにちは、スマボです」</div></div>
+          <span class="btn on">Normal</span><span class="btn">Smile</span><span class="btn">Sleepy</span><span class="btn">Love</span><span class="btn">Wink</span>
+          <div class="pt" style="margin-top:8px">視線</div>
+          <div style="height:46px;border:1px solid var(--border);border-radius:6px;position:relative"><i style="position:absolute;left:58%;top:40%;width:9px;height:9px;border-radius:50%;background:var(--cyan)"></i></div></div>
+        <div class="pnl" style="display:grid;grid-template-rows:auto 1fr auto;gap:5px"><div class="pt">会話</div>
+          <div class="log" style="font-size:10.5px;line-height:1.8">
+            <span style="color:var(--cyan)">あなた ›</span> 前に進んで <span style="color:var(--dim)">(音声認識)</span><br>
+            <span style="color:var(--accent)">smabo ›</span> はい、進みます <span style="color:var(--dim)">(/speech/say)</span><br>
+            <span style="color:var(--cyan)">あなた ›</span> 止まって<br><span style="color:var(--accent)">smabo ›</span> 止まりました</div>
+          <div style="display:flex;gap:5px"><div class="pnl" style="flex:1;padding:4px 7px;color:var(--dim)">話す内容を入力…</div><span class="btn on">🎤</span><span class="btn">送信</span></div>
+          <span class="badge" style="right:6px;top:6px">2</span></div>
+        <div class="pnl"><div class="pt">振る舞い（Vision）</div>
+          <div class="tog">人を見つめる</div><div class="tog off">首で追う</div><div class="tog off">近づく</div>
+          <div class="cam" style="height:42%;margin-top:6px"><div class="det" style="left:35%;top:30%;width:26%;height:55%"><span>face</span></div></div>
+          <span class="badge" style="right:6px;top:6px">3</span></div>
+      </div>
+    </div>
+    <h3>4 つのモードの中身</h3>
+    <div class="cols" style="grid-template-columns: repeat(4, 1fr); gap:10px; margin-top:6px;">
+      <div class="pnl" style="color:var(--text)"><div class="pt">🕹 操縦</div><span style="color:var(--dim)">カメラ＋地図＋ジョイスティック、Nav2 のゴール指定</span></div>
+      <div class="pnl" style="color:var(--text)"><div class="pt">💬 対話</div><span style="color:var(--dim)">顔・視線・会話ログ・発話、Vision の振る舞い</span></div>
+      <div class="pnl" style="color:var(--text)"><div class="pt">🔧 調整</div><span style="color:var(--dim)">サーボ校正、DC の min_duty、MoveIt、Config</span></div>
+      <div class="pnl" style="color:var(--text)"><div class="pt">🩺 診断</div><span style="color:var(--dim)">トピック一覧と Hz、接続、IMU / GPS 生値、ログ</span></div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>モードの切り替え。タブは 4 つだけ。</span></li>
+      <li><b class="n">2</b><span>音声認識の結果と発話を、チャットのように 1 本の会話にまとめる。</span></li>
+      <li><b class="n">3</b><span>そのモードで使う設定だけを横に置く（Config タブに行かなくてよい）。</span></li>
+    </ol>
+    <div class="cols">
+      <div class="pro"><h3>良いところ</h3><ul><li>迷わない。初めて触る人にも説明しやすい</li><li>今のタブの中身を振り分けるだけで始められる</li></ul></div>
+      <div class="con"><h3>気になるところ</h3><ul><li>モードをまたぐ作業（走りながら会話）は切り替えが要る</li><li>どこに置くか決めにくい機能が出る</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============================== D ============================== -->
+  <section class="concept" id="d">
+    <div class="head"><span class="tag">D</span><h2>パネルを自由に並べるダッシュボード</h2></div>
+    <p class="one">すべての機能を「パネル」にして、グリッドに好きに並べて保存します。Foxglove のような使い方です。</p>
+    <div class="frame" style="grid-template-rows: 30px 1fr;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp warn">phone</span>
+        <span class="btn on">レイアウト: 実験用 ▾</span><span class="btn">＋ パネル</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr 1fr 1fr; gap:7px; padding:7px; min-height:0;">
+        <div class="cam" style="grid-column: span 2; grid-row: span 2;"><div class="wall"></div><div class="wall b"></div><span class="live">Camera</span><span class="grip">⠿⠿</span></div>
+        <div class="map" style="grid-column: span 2; grid-row: span 2; border:1px solid var(--border)"><svg viewBox="0 0 200 110"><rect x="10" y="10" width="180" height="90" fill="none" stroke="var(--m-wall)" stroke-width="2"/><rect x="110" y="45" width="30" height="20" fill="var(--m-wall)"/><circle cx="50" cy="80" r="4" fill="var(--accent)"/><path d="M50 80 Q90 40 130 30" stroke="var(--cyan)" fill="none" stroke-dasharray="4 3"/></svg><span class="grip" style="z-index:2">⠿⠿</span><span class="badge" style="left:8px;top:8px">1</span></div>
+        <div class="pnl"><div class="pt">/imu/data</div><svg viewBox="0 0 100 30" style="width:100%;height:60%"><polyline points="0,15 10,12 20,18 30,9 40,16 50,14 60,20 70,8 80,15 90,13 100,16" fill="none" stroke="var(--cyan)"/></svg><span class="grip">⠿⠿</span></div>
+        <div class="pnl"><div class="pt">Joint states</div><div class="meter"><i style="width:40%"></i></div><div class="meter"><i style="width:70%"></i></div><div class="meter"><i style="width:55%"></i></div><span class="grip">⠿⠿</span></div>
+        <div class="pnl"><div class="pt">Drive</div><div class="joy" style="width:40px;height:40px;margin:0"></div><span class="grip">⠿⠿</span></div>
+        <div class="ghost">＋ ここにパネルを追加<span class="badge" style="position:static;margin-left:6px">2</span></div>
+      </div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>どのパネルもつまんで移動・拡大できる（⠿⠿ がつまみ）。</span></li>
+      <li><b class="n">2</b><span>パネルの追加。並べ方は「実験用」「デモ用」のように名前を付けて保存。</span></li>
+    </ol>
+    <div class="cols">
+      <div class="pro"><h3>良いところ</h3><ul><li>実験ごとに必要なものだけ並べられる</li><li>新機能はパネルを 1 つ足すだけ</li></ul></div>
+      <div class="con"><h3>気になるところ</h3><ul><li>レイアウト機能そのものの作り込みが一番大きい</li><li>初期配置が良くないと散らかる</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============================== E ============================== -->
+  <section class="concept" id="e">
+    <div class="head"><span class="tag">E</span><h2>タブレット向けのコントローラー</h2></div>
+    <p class="one">横向きのタブレットを両手で持って操作する画面。カメラを全面に出し、操作は親指で届く位置に置きます。</p>
+    <div style="background:#0b0d14; border-radius: 26px; padding: 14px; max-width: 900px; margin: 0 auto;">
+      <div class="frame" style="grid-template-rows: 1fr; border-radius: 14px;">
+        <div class="cam" style="border-radius:0">
+          <div class="wall"></div><div class="wall b"></div>
+          <div class="det" style="left:44%;top:44%;width:13%;height:28%"><span>person</span></div>
+          <div style="position:absolute;top:8px;left:10px;display:flex;gap:6px">
+            <span class="btn" style="background:rgba(15,52,96,.85)"><span class="lamp">接続</span></span>
+            <span class="btn" style="background:rgba(15,52,96,.85)">🔋 76%</span><span class="sim">SIM</span></div>
+          <span class="estop" style="position:absolute;top:8px;right:10px;font-size:13px;padding:6px 14px">■ 停止</span>
+          <div class="joy" style="position:absolute;left:4%;bottom:7%;width:96px;height:96px;background:radial-gradient(circle, rgba(15,52,96,.7) 0 60%, rgba(15,52,96,.3) 61%);"></div>
+          <div class="joy" style="position:absolute;right:4%;bottom:7%;width:96px;height:96px;background:radial-gradient(circle, rgba(15,52,96,.7) 0 60%, rgba(15,52,96,.3) 61%);"></div>
+          <div style="position:absolute;left:4%;bottom:calc(7% + 104px);color:#fff;text-shadow:0 1px 2px #000">走行</div>
+          <div style="position:absolute;right:4%;bottom:calc(7% + 104px);color:#fff;text-shadow:0 1px 2px #000">首・視線</div>
+          <div style="position:absolute;left:50%;bottom:8%;transform:translateX(-50%);display:flex;gap:6px">
+            <span class="btn" style="font-size:16px">😊</span><span class="btn" style="font-size:16px">😴</span><span class="btn" style="font-size:16px">❤</span><span class="btn on" style="font-size:16px">🎤</span></div>
+          <div style="position:absolute;right:0;top:40%;width:10px;height:60px;border-radius:6px 0 0 6px;background:rgba(0,188,212,.6)"></div>
+          <span class="badge" style="left:30%;bottom:22%">1</span><span class="badge" style="left:58%;bottom:20%">2</span><span class="badge" style="right:16px;top:36%">3</span>
+        </div>
+      </div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>左右の親指でジョイスティック。左は走行、右は首と視線。</span></li>
+      <li><b class="n">2</b><span>よく使う表情と、押して話すマイク。</span></li>
+      <li><b class="n">3</b><span>右端の引き出しに地図・設定をしまう。</span></li>
+    </ol>
+    <div class="cols">
+      <div class="pro"><h3>良いところ</h3><ul><li>実機を持ち出して動かすときに最強</li><li>子どもや来場者にも渡せる</li></ul></div>
+      <div class="con"><h3>気になるところ</h3><ul><li>開発・調整の画面は別に必要</li><li>PC では大味に見える</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============================== Recommended ============================== -->
+  <section class="concept" id="rec" style="border-color: var(--accent); border-width: 2px;">
+    <div class="head"><span class="tag rec">おすすめ</span><h2>A + B + C の組み合わせ</h2></div>
+    <p class="one">コックピット（A）を土台にして、メイン画面を「カメラ／3D ツイン＋地図」の切り替え（B）にします。右の操作パネルは目的別モード（C）で中身が入れ替わります。</p>
+    <div class="frame" style="grid-template-rows: 30px 1fr 40px;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="sim">SIM</span>
+        <span class="btn" style="color:var(--dim)">⌘K コマンド</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:grid; grid-template-columns: 1fr 30%; gap:7px; padding:7px; min-height:0;">
+        <div style="display:grid; grid-template-rows: 1fr 30%; gap:7px; min-height:0;">
+          <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);">
+            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet">
+              <g stroke="var(--m-grid)"><path d="M40 190 L360 190 M80 160 L320 160 M110 135 L290 135"/><path d="M40 190 L110 135 M200 190 L200 135 M360 190 L290 135"/></g>
+              <g fill="var(--accent)"><circle cx="72" cy="160" r="1.6"/><circle cx="82" cy="150" r="1.6"/><circle cx="310" cy="150" r="1.6"/><circle cx="318" cy="161" r="1.6"/></g>
+              <path d="M200 172 Q240 150 275 138" stroke="var(--cyan)" stroke-width="2" fill="none" stroke-dasharray="5 4"/>
+              <rect x="170" y="140" width="60" height="30" rx="5" fill="var(--m-body)" stroke="var(--m-body-edge)"/>
+              <rect x="183" y="116" width="34" height="24" rx="3" fill="var(--m-screen)" stroke="var(--cyan)"/>
+              <circle cx="194" cy="128" r="3" fill="var(--m-eye)"/><circle cx="206" cy="128" r="3" fill="var(--m-eye)"/>
+              <circle cx="176" cy="171" r="8" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/><circle cx="224" cy="171" r="8" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/>
+            </svg>
+            <div class="seg"><span>カメラ</span><span class="on">3D ツイン</span><span>上から</span></div>
+            <span class="badge" style="left:10px;top:10px">1</span>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:7px; min-height:0">
+            <div class="cam"><div class="wall"></div><div class="wall b"></div><span class="live">camera</span></div>
+            <div class="pnl"><div class="pt">センサー</div><div class="row">IMU <b>pitch 89°</b></div><div class="row">GPS <b>35.6813, 139.7671</b></div><div class="row">scan <b>10 Hz</b></div></div>
+          </div>
+        </div>
+        <div class="pnl" style="display:grid; grid-template-rows:auto auto 1fr; gap:6px;">
+          <div class="tabs" style="flex-wrap:wrap"><span class="on">🕹 操縦</span><span>💬 対話</span><span>🔧 調整</span><span>🩺 診断</span></div>
+          <span class="badge" style="right:6px;top:6px">2</span>
+          <div><div class="joy"></div><div class="row">lin <b>0.12</b></div><div class="row">ang <b>0.30</b></div></div>
+          <div><div class="pt">Nav2</div><span class="btn on">地図をクリックでゴール</span><span class="btn">初期位置</span><span class="btn">キャンセル</span>
+            <div class="pt" style="margin-top:6px">速度上限</div><div class="meter"><i style="width:45%"></i></div></div>
+        </div>
+      </div>
+      <div class="pnl" style="margin:0 7px 7px"><div class="log"><b>09:07:20</b> 🎤「止まって」 → /cmd_vel 0 &nbsp; <i>09:07:25</i> Nav2 goal accepted &nbsp; <b>09:07:30</b> 🔊「こんにちは」</div><span class="badge" style="right:8px;top:4px">3</span></div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>メイン画面は 3D ツイン／カメラ／上からの地図を切り替え。もう一方は下に小さく残す。</span></li>
+      <li><b class="n">2</b><span>右パネルは目的別モード。操縦・対話・調整・診断で中身が変わる。</span></li>
+      <li><b class="n">3</b><span>出来事のタイムライン。音声・指令・Nav2 を 1 本で追える。</span></li>
+    </ol>
+    <h3>進め方（段階的に）</h3>
+    <ol style="margin:4px 0 0; padding-left:1.3em">
+      <li>「機能モジュール」の仕組みと構成の検出を最初に作る（下の「構成に合わせる」「機能を足せる作り」）。今の 9 タブも、この形のモジュールに移していく。</li>
+      <li>画面の骨組み（ステータスバー・メイン画面・右パネル・タイムライン）を作り、今のタブの中身をそのまま右パネルに載せる。</li>
+      <li>メイン画面を作る。カメラと、Nav タブの 3D 表示を統合する。</li>
+      <li>3D ツイン。smabo_description のメッシュと /joint_states で関節を動かし、部位クリックで右パネルを切り替える。モデルは付いている部品だけで組み立てる（スマホだけならスマホとスタンドのみ）。</li>
+      <li>各モードの中身を 1 つずつ作り直し、Config の項目を使う場所へ移す。</li>
+    </ol>
+  </section>
+
+  <!-- ============================== Config ============================== -->
+  <section class="concept" id="config">
+    <div class="head"><span class="tag">構成</span><h2>付いている部品に合わせて画面を変える</h2></div>
+    <p class="one">スマホは必ずあり、それ以外（ESP32・首のサーボ・アーム・車輪・エンコーダ・LiDAR）はあったりなかったりします。UI は今つながっているものを検出し、使える機能だけを出します。下は同じおすすめ案の画面が、構成によってどう変わるかの例です。</p>
+
+    <div class="cfg3">
+      <div>
+        <h4>① スマホだけ</h4>
+        <span class="mod y">スマホ</span><span class="mod">ESP32</span><span class="mod">車輪</span><span class="mod">サーボ</span><span class="mod">LiDAR</span>
+        <div class="frame" style="grid-template-rows: 24px 1fr;">
+          <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+          <div style="display:grid; grid-template-columns: 1fr 42%; gap:5px; padding:5px; min-height:0">
+            <div style="display:grid; grid-template-rows: 1fr 34%; gap:5px; min-height:0">
+              <div class="cam"><div class="wall"></div><div class="det" style="left:40%;top:42%;width:18%;height:32%"><span>face</span></div><span class="live">camera</span></div>
+              <div class="pnl"><div class="pt">センサー</div><div class="row">IMU <b>89°</b></div><div class="row">GPS <b>35.68,139.76</b></div></div>
+            </div>
+            <div class="pnl"><div class="tabs" style="flex-wrap:wrap"><span class="on">💬 対話</span><span>🩺 診断</span></div>
+              <div class="face" style="padding:8px 0"><i></i><i></i></div>
+              <span class="btn">😊</span><span class="btn">😴</span><span class="btn">❤</span>
+              <div class="pt" style="margin-top:6px">視線</div><div style="height:26px;border:1px solid var(--border);border-radius:5px"></div>
+              <div style="margin-top:5px"><span class="btn on">🎤</span><span class="btn">話す…</span></div></div>
+          </div>
+        </div>
+        <p class="caption">顔・視線・会話・カメラ・IMU・GPS だけ。操縦と調整のモードは出さない。緊急停止は発話・動作の停止として残す。</p>
+      </div>
+      <div>
+        <h4>② スマホ＋車輪</h4>
+        <span class="mod y">スマホ</span><span class="mod y">ESP32</span><span class="mod y">車輪</span><span class="mod">サーボ</span><span class="mod">LiDAR</span>
+        <div class="frame" style="grid-template-rows: 24px 1fr;">
+          <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+          <div style="display:grid; grid-template-columns: 1fr 42%; gap:5px; padding:5px; min-height:0">
+            <div style="display:grid; grid-template-rows: 1fr 40%; gap:5px; min-height:0">
+              <div class="cam"><div class="wall"></div><div class="wall b"></div><span class="live">camera</span></div>
+              <div class="map"><svg viewBox="0 0 100 40"><path d="M10 32 Q40 30 55 15 T90 8" stroke="var(--cyan)" fill="none" stroke-dasharray="3 2"/><circle cx="90" cy="8" r="3" fill="var(--accent)"/></svg></div>
+            </div>
+            <div class="pnl"><div class="tabs" style="flex-wrap:wrap"><span class="on">🕹 操縦</span><span>💬</span><span>🔧</span><span>🩺</span></div>
+              <div class="joy" style="width:48px;height:48px"></div>
+              <div class="row">lin <b>0.12</b></div>
+              <div class="lock" style="margin-top:5px">Nav2 ゴール<br>（LiDAR が無いので<br>地図なし・軌跡のみ）</div></div>
+          </div>
+        </div>
+        <p class="caption">ジョイスティックと、オドメトリの軌跡（TrailMap）が出る。LiDAR が無いので地図と Nav2 は出さず、理由を表示する。</p>
+      </div>
+      <div>
+        <h4>③ 全部入り</h4>
+        <span class="mod y">スマホ</span><span class="mod y">ESP32</span><span class="mod y">車輪</span><span class="mod y">サーボ</span><span class="mod y">LiDAR</span>
+        <div class="frame" style="grid-template-rows: 24px 1fr;">
+          <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+          <div style="display:grid; grid-template-columns: 1fr 42%; gap:5px; padding:5px; min-height:0">
+            <div style="display:grid; grid-template-rows: 1fr 40%; gap:5px; min-height:0">
+              <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);"><svg viewBox="0 0 200 110"><rect x="78" y="60" width="44" height="22" rx="4" fill="var(--m-body)" stroke="var(--m-body-edge)"/><rect x="88" y="42" width="24" height="18" rx="3" fill="var(--m-screen)" stroke="var(--cyan)"/><path d="M122 66 L138 54 L148 60" stroke="var(--orange)" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="82" cy="84" r="6" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/><circle cx="118" cy="84" r="6" fill="var(--m-wheel)" stroke="var(--m-body-edge)"/><g fill="var(--accent)"><circle cx="30" cy="80" r="1.5"/><circle cx="36" cy="72" r="1.5"/><circle cx="170" cy="72" r="1.5"/><circle cx="176" cy="80" r="1.5"/></g></svg></div>
+              <div class="cam"><div class="wall"></div><span class="live">camera</span></div>
+            </div>
+            <div class="pnl"><div class="tabs" style="flex-wrap:wrap"><span>🕹</span><span>💬</span><span class="on">🔧 調整</span><span>🩺</span></div>
+              <div class="row">head_pan <b>0°</b></div><div class="meter"><i style="width:50%;background:var(--orange)"></i></div>
+              <div class="row">arm_1 <b>12°</b></div><div class="meter"><i style="width:56%;background:var(--orange)"></i></div>
+              <div class="row">arm_2 <b>-30°</b></div><div class="meter"><i style="width:33%;background:var(--orange)"></i></div>
+              <span class="btn on">MoveIt</span><span class="btn">校正</span></div>
+          </div>
+        </div>
+        <p class="caption">3D ツイン・地図・Nav2・アーム・MoveIt まで全部出る。今の smabo-web とほぼ同じ機能量。</p>
+      </div>
+    </div>
+
+    <h3 id="phone-only">スマホだけのとき、おすすめ案（A+B+C）はこうなる</h3>
+    <div class="frame" style="grid-template-rows: 30px 1fr 40px;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">phone</span>
+        <span class="btn" style="color:var(--dim)">構成: スマホのみ</span><span class="badge" style="position:static">1</span>
+        <span class="btn" style="color:var(--dim)">⌘K コマンド</span><span class="estop">■ 停止（発話・動作）</span></div>
+      <div style="display:grid; grid-template-columns: 1fr 34%; gap:7px; padding:7px; min-height:0;">
+        <div style="display:grid; grid-template-rows: 1fr 32%; gap:7px; min-height:0;">
+          <div class="cam"><div class="wall"></div><div class="wall b"></div>
+            <div class="det" style="left:45%;top:36%;width:13%;height:30%"><span>face 0.94</span></div>
+            <span class="live">camera</span><div class="seg"><span class="on">カメラ</span><span>位置（GPS）</span></div>
+            <span class="badge" style="left:30%;top:8px">2</span></div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:7px; min-height:0">
+            <div class="map" style="border:1px solid var(--border)"><svg viewBox="0 0 120 60">
+              <g stroke="var(--m-grid)" stroke-width="5"><path d="M0 20 H120 M0 45 H120 M30 0 V60 M85 0 V60"/></g>
+              <circle cx="58" cy="32" r="9" fill="var(--cyan)" opacity=".2"/><circle cx="58" cy="32" r="3" fill="var(--accent)"/></svg>
+              <span class="live" style="font-size:8px">GPS ±3m</span></div>
+            <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%); border:1px solid var(--border)">
+              <svg viewBox="0 0 120 60"><g transform="rotate(-12 60 30)"><rect x="46" y="8" width="28" height="46" rx="5" fill="var(--m-screen)" stroke="var(--cyan)" stroke-width="1.5"/><circle cx="55" cy="26" r="2.5" fill="var(--m-eye)"/><circle cx="65" cy="26" r="2.5" fill="var(--m-eye)"/></g>
+              <path d="M20 54 H100" stroke="var(--m-grid)"/></svg>
+              <span class="live" style="font-size:8px">姿勢（IMU）</span><span class="badge" style="right:4px;top:4px">3</span></div>
+            <div class="pnl"><div class="pt">センサー</div><div class="row">pitch <b>89°</b></div><div class="row">roll <b>-12°</b></div><div class="row">GPS <b>35.6813</b></div><div class="row">cam <b>10 fps</b></div></div>
+          </div>
+        </div>
+        <div class="pnl" style="display:grid; grid-template-rows:auto auto 1fr auto; gap:6px;">
+          <div class="tabs" style="flex-wrap:wrap"><span class="on">💬 対話</span><span>🩺 診断</span></div>
+          <span class="badge" style="right:6px;top:6px">4</span>
+          <div style="display:grid; grid-template-columns: 44% 1fr; gap:6px">
+            <div style="background:var(--m-face);border-radius:6px;padding:6px 0"><div class="face" style="gap:8px"><i style="width:11px;height:11px"></i><i style="width:11px;height:11px"></i></div></div>
+            <div><span class="btn on">Normal</span><span class="btn">Smile</span><span class="btn">Sleepy</span><span class="btn">Love</span>
+              <div class="tog" style="margin-top:4px">人を見つめる（目だけ）</div></div>
+          </div>
+          <div class="log" style="font-size:10px;line-height:1.75">
+            <span style="color:var(--cyan)">あなた ›</span> こんにちは<br><span style="color:var(--accent)">smabo ›</span> こんにちは、スマボです<br>
+            <span style="color:var(--cyan)">あなた ›</span> 今どこにいるの<br><span style="color:var(--accent)">smabo ›</span> 東京駅の近くです</div>
+          <div style="display:flex;gap:5px"><div class="pnl" style="flex:1;padding:3px 7px;color:var(--dim)">話す内容…</div><span class="btn on">🎤</span></div>
+        </div>
+      </div>
+      <div class="pnl" style="margin:0 7px 7px"><div class="log"><b>10:20:01</b> 🎤「こんにちは」 &nbsp; <b>10:20:02</b> 🔊「こんにちは、スマボです」 &nbsp; <i>10:20:05</i> 顔を検出 → 見つめる &nbsp; <b>10:20:09</b> 表情 Smile</div><span class="badge" style="right:8px;top:4px">5</span></div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>ESP32 のランプは出さず、「構成: スマホのみ」とだけ示す。押すと、何をつなぐと何が増えるかの一覧が出る。</span></li>
+      <li><b class="n">2</b><span>メイン画面（A）はカメラ。切り替え先は 3D ツインではなく GPS の地図になる。</span></li>
+      <li><b class="n">3</b><span>3D ツイン（B）はスマホ本体だけ。IMU の姿勢でスマホの傾きを動かす小窓になる。</span></li>
+      <li><b class="n">4</b><span>モード（C）は「対話」と「診断」だけ。操縦・調整は出ない。首が無いので「見つめる」は目だけ、「首で追う」「近づく」は出ない。</span></li>
+      <li><b class="n">5</b><span>タイムラインは音声・発話・表情・検出だけになるが、仕組みは同じ。</span></li>
+    </ol>
+    <p class="caption">機械学習モジュールが入っていれば、必要な部品はスマホだけなので「🧠 学習」モードも出る（カメラの画像集め・検出モデルの切り替えなど）。車輪をつなぐと、その場で「🕹 操縦」モードとジョイスティックが増える。</p>
+
+    <h3>何を見て「付いている」と判断するか</h3>
+    <div class="tablewrap"><table>
+      <tr><th>部品</th><th>判断のしかた</th><th>あると出るもの</th></tr>
+      <tr><td>スマホ（必須）</td><td>/app/… のトピック（カメラ・IMU・GPS・音声）が届いている</td><td>顔・視線・会話・カメラ・Vision の振る舞い・IMU / GPS</td></tr>
+      <tr><td>ESP32</td><td>/esp32/… が届く、または ESP32 の REST（/config）に応答がある</td><td>ステータスバーの esp32 ランプ、Config のうち ESP32 側の項目</td></tr>
+      <tr><td>車輪</td><td>ESP32 の modes の <code>dc_drive</code> / <code>encoder_drive</code>、/odom が届く</td><td>ジョイスティック、軌跡、速度上限・min_duty の設定</td></tr>
+      <tr><td>サーボ（首・アーム）</td><td>modes の <code>servos</code> と、設定にある関節のグループ、/joint_states</td><td>首の操作・視線の首追従、アームパネル、MoveIt（アームの関節があるときだけ）</td></tr>
+      <tr><td>LiDAR</td><td>modes の <code>lidar</code>、/scan が届く</td><td>スキャン表示、地図（SLAM）、Nav2 のゴール指定</td></tr>
+    </table></div>
+    <p class="caption">組み合わせで初めて出る機能もある。例: Nav2 は「車輪＋LiDAR」、Vision の「近づく」は「車輪」、「首で追う」は「首のサーボ」が必要。</p>
+
+    <h3>作り方のルール</h3>
+    <ul style="margin:4px 0 0; padding-left:1.2em">
+      <li><b>パネルは必要な部品を宣言する。</b>例: Nav2 パネルは <code>requires: ["wheels", "lidar"]</code>。足りなければ出さない。モードも、中身のパネルが 1 つも出なければタブごと消す。</li>
+      <li><b>途中で切れたら、消さずに灰色にする。</b>走行中に ESP32 が落ちたときにパネルが消えると、配置がずれて誤操作につながる。「切断中」と表示して操作を無効にする。最初から無い部品のパネルとは区別する。</li>
+      <li><b>手動で上書きできる。</b>検出が間違っていたときや、まだつないでいない部品の設定を先にしたいときのために、設定で「この部品はある／ない」を指定できるようにする。</li>
+      <li><b>機能が減っても空っぽに見せない。</b>スマホだけでも、顔とカメラが大きく出る「対話」画面が主役になるようにする。</li>
+    </ul>
+
+    <h3>各案は構成の違いにどう対応するか</h3>
+    <div class="tablewrap"><table>
+      <tr><th>案</th><th>スマホだけのとき</th><th>相性</th></tr>
+      <tr><td><b>A</b> コックピット</td><td>右パネルが顔と会話になり、メイン画面はカメラだけ。地図の小窓は出さない。</td><td class="dots">●●●●<s>●</s></td></tr>
+      <tr><td><b>B</b> デジタルツイン</td><td>3D モデルはスマホとスタンドだけになり、クリックできる部位がほぼ無い。モデルを部品ごとに組み立てる仕組みが要る。</td><td class="dots">●●<s>●●●</s></td></tr>
+      <tr><td><b>C</b> 目的別モード</td><td>「対話」と「診断」だけが残る。モード単位で消せるので一番わかりやすい。</td><td class="dots">●●●●●</td></tr>
+      <tr><td><b>D</b> ダッシュボード</td><td>使えないパネルは「＋パネル」の一覧で灰色になる。保存した配置に使えないパネルがあると穴があく。</td><td class="dots">●●●<s>●●</s></td></tr>
+      <tr><td><b>E</b> タブレット</td><td>左の走行スティックが消え、右の首・視線スティックは首のサーボが無ければ視線だけを動かす。</td><td class="dots">●●●<s>●●</s></td></tr>
+    </table></div>
+    <p class="caption">おすすめ案（A+B+C）は、構成に合わせる部分を C のモードと A のパネルに任せ、B の 3D ツインは「車輪かサーボがあるときにメイン画面の選択肢に出る」扱いにするのがよい。</p>
+  </section>
+
+  <!-- ============================== Extend ============================== -->
+  <section class="concept" id="extend">
+    <div class="head"><span class="tag">拡張</span><h2>機能をあとから足せる作り</h2></div>
+    <p class="one">機械学習のように、これから増える機能を画面の作り直しなしで足せるようにします。画面の骨組み（ステータスバー・メイン画面・右パネル・タイムライン）は固定し、機能はすべて「機能モジュール」として差し込みます。部品の有無への対応も、この仕組みでまとめて扱います。</p>
+
+    <svg class="arch" viewBox="0 0 900 360" role="img" aria-label="骨組みと機能モジュールの関係">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="var(--m-arrow)"/></marker></defs>
+      <rect x="10" y="20" width="200" height="320" rx="12" fill="var(--bg2)" stroke="var(--border)"/>
+      <text x="110" y="46" text-anchor="middle" fill="var(--cyan)" font-size="14" font-weight="700">できること（検出）</text>
+      <g font-size="12.5" fill="var(--text)">
+        <text x="28" y="78">部品</text>
+        <text x="40" y="100" fill="var(--m-sub)">phone / esp32 / wheels</text>
+        <text x="40" y="120" fill="var(--m-sub)">servos.head / servos.arm</text>
+        <text x="40" y="140" fill="var(--m-sub)">lidar</text>
+        <text x="28" y="176">brain のソフト</text>
+        <text x="40" y="198" fill="var(--m-sub)">stt / nav2 / moveit / slam</text>
+        <text x="40" y="218" fill="var(--orange)">ml.detector</text>
+        <text x="40" y="238" fill="var(--orange)">ml.policy</text>
+        <text x="28" y="276" font-size="11" fill="var(--dim)">トピックの到着、ESP32 の</text>
+        <text x="28" y="292" font-size="11" fill="var(--dim)">modes、brain が出す一覧</text>
+        <text x="28" y="308" font-size="11" fill="var(--dim)">から決める</text>
+      </g>
+      <rect x="260" y="20" width="270" height="320" rx="12" fill="var(--bg2)" stroke="var(--border)"/>
+      <text x="395" y="46" text-anchor="middle" fill="var(--cyan)" font-size="14" font-weight="700">機能モジュール</text>
+      <g font-size="12.5">
+        <rect x="280" y="62" width="230" height="30" rx="6" fill="var(--bg3)"/><text x="292" y="82" fill="var(--text)">face　顔・視線</text>
+        <rect x="280" y="100" width="230" height="30" rx="6" fill="var(--bg3)"/><text x="292" y="120" fill="var(--text)">drive　走行</text>
+        <rect x="280" y="138" width="230" height="30" rx="6" fill="var(--bg3)"/><text x="292" y="158" fill="var(--text)">nav　地図・Nav2</text>
+        <rect x="280" y="176" width="230" height="30" rx="6" fill="var(--bg3)"/><text x="292" y="196" fill="var(--text)">arm　アーム・MoveIt</text>
+        <rect x="280" y="214" width="230" height="30" rx="6" fill="var(--bg3)"/><text x="292" y="234" fill="var(--text)">…今の 9 タブを分けたもの</text>
+        <rect x="280" y="258" width="230" height="30" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/><text x="292" y="278" fill="var(--accent)">＋ ml　機械学習（新規）</text>
+        <rect x="280" y="296" width="230" height="30" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/><text x="292" y="316" fill="var(--accent)">＋ 次に足すもの</text>
+      </g>
+      <rect x="580" y="20" width="310" height="320" rx="12" fill="var(--bg2)" stroke="var(--border)"/>
+      <text x="735" y="46" text-anchor="middle" fill="var(--cyan)" font-size="14" font-weight="700">画面の骨組み（固定）</text>
+      <g font-size="12.5" fill="var(--text)">
+        <rect x="600" y="62" width="270" height="26" rx="5" fill="var(--bg3)"/><text x="612" y="80">ステータスバー（ランプ）</text>
+        <rect x="600" y="96" width="170" height="92" rx="5" fill="var(--bg3)"/><text x="612" y="116">メイン画面</text><text x="612" y="136" font-size="11" fill="var(--m-sub)">カメラの上に重ねる</text><text x="612" y="152" font-size="11" fill="var(--m-sub)">表示（検出枠など）</text>
+        <rect x="778" y="96" width="92" height="92" rx="5" fill="var(--bg3)"/><text x="788" y="116">右パネル</text><text x="788" y="136" font-size="11" fill="var(--m-sub)">モード別</text>
+        <rect x="600" y="196" width="270" height="26" rx="5" fill="var(--bg3)"/><text x="612" y="214">タイムライン</text>
+        <rect x="600" y="230" width="130" height="26" rx="5" fill="var(--bg3)"/><text x="612" y="248">⌘K コマンド</text>
+        <rect x="740" y="230" width="130" height="26" rx="5" fill="var(--bg3)"/><text x="752" y="248">設定</text>
+        <text x="600" y="290" font-size="11" fill="var(--dim)">モジュールは決まった「差し込み口」に</text>
+        <text x="600" y="306" font-size="11" fill="var(--dim)">部品を登録するだけ。骨組みは</text>
+        <text x="600" y="322" font-size="11" fill="var(--dim)">個々の機能を知らない</text>
+      </g>
+      <path d="M210 180 L255 180" stroke="var(--m-arrow)" stroke-width="2" marker-end="url(#ar)"/>
+      <text x="232" y="170" text-anchor="middle" font-size="11" fill="var(--dim)">requires</text>
+      <path d="M530 180 L575 180" stroke="var(--m-arrow)" stroke-width="2" marker-end="url(#ar)"/>
+      <text x="552" y="170" text-anchor="middle" font-size="11" fill="var(--dim)">登録</text>
+    </svg>
+
+    <h3>モジュールが宣言するもの（例: 機械学習）</h3>
+    <pre class="code"><span class="c">// src/features/ml/index.ts（案）</span>
+<span class="k">export default</span> defineFeature({
+  id: <span class="s">"ml"</span>,
+  title: <span class="s">"機械学習"</span>,
+  requires: [<span class="s">"phone"</span>],                 <span class="c">// これが無ければ何も出さない</span>
+  optional: [<span class="s">"ml.detector"</span>, <span class="s">"ml.policy"</span>, <span class="s">"wheels"</span>, <span class="s">"servos.arm"</span>],
+  mode: { id: <span class="s">"learn"</span>, label: <span class="s">"🧠 学習"</span> },   <span class="c">// 新しいモードを足す（既存モードに入れてもよい）</span>
+  panels: [DatasetPanel, TrainPanel, ModelPanel],
+  overlays: [DetectionOverlay],          <span class="c">// メイン画面のカメラに重ねる</span>
+  commands: [{ label: <span class="s">"推論を開始"</span>, run: startInference }],  <span class="c">// ⌘K に出る</span>
+  timeline: [<span class="s">"/ml/events"</span>],                <span class="c">// タイムラインに流す出来事</span>
+  settings: MlSettings,                  <span class="c">// 設定画面の一節</span>
+});</pre>
+    <p class="caption">骨組みは <code>features/</code> の一覧を読むだけ。機能を足すときはフォルダを 1 つ足し、既存のコードには触らない。</p>
+
+    <h3>機械学習モジュールを足したときの画面</h3>
+    <div class="frame" style="grid-template-rows: 30px 1fr 40px;">
+      <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="lamp warn">学習中 63%</span><span class="badge" style="position:static">1</span><span class="estop">■ 緊急停止</span></div>
+      <div style="display:grid; grid-template-columns: 1fr 32%; gap:7px; padding:7px; min-height:0;">
+        <div class="cam slot"><div class="wall"></div><div class="wall b"></div>
+          <div class="det" style="left:44%;top:44%;width:14%;height:28%;border-color:var(--orange)"><span style="background:var(--orange)">cup 0.91</span></div>
+          <div class="det" style="left:12%;top:52%;width:12%;height:20%;border-color:var(--orange)"><span style="background:var(--orange)">ball 0.77</span></div>
+          <span class="live">camera</span><div class="seg"><span class="on">検出: 自作モデル v3</span></div>
+          <span class="badge" style="left:30%;top:8px">2</span></div>
+        <div class="pnl" style="display:grid; grid-template-rows:auto auto auto 1fr; gap:6px;">
+          <div class="tabs" style="flex-wrap:wrap"><span>🕹</span><span>💬</span><span>🔧</span><span class="on slot">🧠 学習</span><span>🩺</span></div>
+          <div><div class="pt">データを集める</div><span class="btn on">● 記録</span><span class="btn">ラベル付け</span><div class="row">エピソード <b>42</b></div><div class="row">画像 <b>1,830</b></div></div>
+          <div><div class="pt">学習</div><div class="row">loss <b>0.214</b></div><svg viewBox="0 0 100 24" style="width:100%;height:24px"><polyline points="0,3 15,9 30,13 45,16 60,18 75,19 90,20 100,20" fill="none" stroke="var(--cyan)"/></svg><div class="meter"><i style="width:63%"></i></div></div>
+          <div><div class="pt">モデル</div><span class="btn on">v3（使用中）</span><span class="btn">v2</span><span class="btn">比べる</span></div>
+          <span class="badge" style="right:6px;top:6px">3</span>
+        </div>
+      </div>
+      <div class="pnl" style="margin:0 7px 7px"><div class="log"><b>10:12:03</b> 記録 #42 保存 &nbsp; <i>10:14:40</i> 学習 epoch 19/30 &nbsp; <b>10:15:02</b> モデル v3 を brain に配置</div><span class="badge" style="right:8px;top:4px">4</span></div>
+    </div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>ステータスバーにはモジュールが自分のランプを足せる（学習の進み具合など）。</span></li>
+      <li><b class="n">2</b><span>カメラへの重ね表示もモジュールから。Vision の検出枠と同じ差し込み口を使う。</span></li>
+      <li><b class="n">3</b><span>新しいモード「学習」。データ集め → 学習 → モデルの切り替えを 1 か所で。</span></li>
+      <li><b class="n">4</b><span>モジュールの出来事もタイムラインに混ざる。音声や走行と時間で突き合わせられる。</span></li>
+    </ol>
+
+    <h3>作り方のルール</h3>
+    <ul style="margin:4px 0 0; padding-left:1.2em">
+      <li><b>「できること」は部品だけでなくソフトも含める。</b>STT・Nav2・MoveIt・学習済みモデルも、部品と同じ扱いで有無を判断する。brain 側に「動いている機能の一覧」を流すトピック（例: <code>/smabo/capabilities</code>、新設）を置くと、web が推測しなくて済む。</li>
+      <li><b>差し込み口の数を絞る。</b>モード・右パネル・メイン画面への重ね表示・ステータスのランプ・タイムライン・⌘K・設定の 7 つ。これ以外の場所はモジュールから触らせない。</li>
+      <li><b>モードもモジュールが足せる。</b>ただし増えすぎないように、まずは既存の 4 モードに入れることを考え、作業の流れが別物のとき（学習のような）だけ新しいモードにする。</li>
+      <li><b>重い処理は brain 側に置く。</b>学習や推論は brain（または別マシン）のノードにして、web は表示と指示だけにする。web は ROS のトピック・サービス・アクションでやり取りするだけなので、モデルの中身が変わっても画面はそのまま。</li>
+      <li><b>モジュールを止められる。</b>設定でモジュールごとにオン・オフできるようにして、使わない機能で画面が混まないようにする。</li>
+    </ul>
+
+    <h3>各案の拡張しやすさ</h3>
+    <div class="tablewrap"><table>
+      <tr><th>案</th><th>機能を足すとき</th><th>相性</th></tr>
+      <tr><td><b>A</b> コックピット</td><td>右パネルとカメラの重ね表示に足す。足し続けると右パネルが溢れる。</td><td class="dots">●●●<s>●●</s></td></tr>
+      <tr><td><b>B</b> デジタルツイン</td><td>部位に結び付かない機能（学習・会話）の置き場所が無い。</td><td class="dots">●●<s>●●●</s></td></tr>
+      <tr><td><b>C</b> 目的別モード</td><td>新しいモードとして足せる。溢れたらモードを分ければよい。</td><td class="dots">●●●●<s>●</s></td></tr>
+      <tr><td><b>D</b> ダッシュボード</td><td>パネルを 1 つ足すだけ。もともと拡張向き。</td><td class="dots">●●●●●</td></tr>
+      <tr><td><b>E</b> タブレット</td><td>操縦専用なので、足す余地はほとんど無い。</td><td class="dots">●<s>●●●●</s></td></tr>
+    </table></div>
+    <p class="caption">おすすめ案（A+B+C）は C のモードで機能の置き場所を増やせるので拡張にも向く。将来、右パネルの中だけ D のように並べ替えられるようにすると、さらに余裕が出る。</p>
+  </section>
+
+  <!-- ============================== Roadmap ============================== -->
+  <section class="concept" id="roadmap">
+    <div class="head"><span class="tag">ロードマップ</span><h2>ガイドのロードマップに沿って、画面はこう増える</h2></div>
+    <p class="one">ガイドのロードマップの 1 ノードを、そのまま 1 つの機能モジュールにします。ガイドを 1 つ進めると、smabo-web にそのノードの機能が現れます。下の図の赤い番号が、続く画面の番号です。ハンド・首振り・アーム・移動ロボットは並行して進められるので、つけた分だけ同時に出ます。</p>
+    <svg class="rmap" viewBox="0 0 900 350" role="img" aria-label="ガイドのロードマップと画面の段階の対応">
+<rect x="0" y="0" width="900" height="88" rx="10" fill="var(--pill)"/><text x="12" y="18" font-size="11" fill="var(--sub)">smabo-brain フェーズ</text>
+<rect x="0" y="94" width="900" height="140" rx="10" fill="var(--pill)" opacity=".55"/><text x="12" y="112" font-size="11" fill="var(--sub)">smabo-esp32 フェーズ</text>
+<rect x="0" y="240" width="900" height="110" rx="10" fill="var(--pill)"/><text x="12" y="258" font-size="11" fill="var(--sub)">brain-ros フェーズ</text>
+<g stroke="var(--sub)" stroke-width="1.4" fill="none">
+<path d="M124 45 H150"/><path d="M254 45 H280"/>
+<path d="M384 45 H400 V76 H829"/><path d="M475 76 V62"/><path d="M593 76 V62"/><path d="M711 76 V62"/><path d="M829 76 V62"/>
+<path d="M332 62 V130"/>
+<path d="M384 147 H400 V122 H829"/><path d="M475 122 V130"/><path d="M593 122 V130"/><path d="M711 122 V130"/><path d="M829 122 V130"/>
+<path d="M400 147 V202 H420"/>
+<path d="M711 164 V185"/>
+<path d="M711 219 V262 H660 V275"/>
+<path d="M475 219 V292 H600"/>
+<path d="M829 164 V275"/>
+<path d="M475 292 V330 H800 V309"/>
+</g>
+<rect x="20" y="28" width="104" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="72.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">smabo-brain</text><circle cx="122" cy="30" r="9" fill="var(--accent)"/><text x="122" y="34" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">1</text>
+<rect x="150" y="28" width="104" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="202.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">smabo-web</text><circle cx="252" cy="30" r="9" fill="var(--accent)"/><text x="252" y="34" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">1</text>
+<rect x="280" y="28" width="104" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="332.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">smabo-app</text><circle cx="382" cy="30" r="9" fill="var(--accent)"/><text x="382" y="34" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">2</text>
+<rect x="420" y="28" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="475.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">顔</text>
+<rect x="538" y="28" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="593.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">スマホセンサ</text>
+<rect x="656" y="28" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="711.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">音声処理</text>
+<rect x="774" y="28" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="829.0" y="49.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">画像処理</text><circle cx="882" cy="30" r="9" fill="var(--accent)"/><text x="882" y="34" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">2</text>
+<rect x="280" y="130" width="104" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="332.0" y="151.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">ベース＋esp32</text><circle cx="382" cy="132" r="9" fill="var(--accent)"/><text x="382" y="136" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">3</text>
+<rect x="420" y="130" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="475.0" y="151.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">ハンド</text><circle cx="528" cy="132" r="9" fill="var(--accent)"/><text x="528" y="136" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">5</text>
+<rect x="538" y="130" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="593.0" y="151.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">首振り</text><circle cx="646" cy="132" r="9" fill="var(--accent)"/><text x="646" y="136" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">4</text>
+<rect x="656" y="130" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="711.0" y="151.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">移動ロボット</text><circle cx="764" cy="132" r="9" fill="var(--accent)"/><text x="764" y="136" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">6</text>
+<rect x="774" y="130" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="829.0" y="151.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">アーム</text><circle cx="882" cy="132" r="9" fill="var(--accent)"/><text x="882" y="136" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">5</text>
+<rect x="420" y="185" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="475.0" y="206.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">brain-ros</text><circle cx="528" cy="187" r="9" fill="var(--accent)"/><text x="528" y="191" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">7</text>
+<rect x="656" y="185" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="711.0" y="206.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">エンコーダ付</text><circle cx="764" cy="187" r="9" fill="var(--accent)"/><text x="764" y="191" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">6</text>
+<rect x="600" y="275" width="120" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="660.0" y="296.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">ナビゲーション</text><circle cx="718" cy="277" r="9" fill="var(--accent)"/><text x="718" y="281" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">7</text>
+<rect x="774" y="275" width="110" height="34" rx="8" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/><text x="829.0" y="296.5" text-anchor="middle" font-size="12.5" fill="var(--ink)">動作計画</text><circle cx="882" cy="277" r="9" fill="var(--accent)"/><text x="882" y="281" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">8</text>
+</svg>
+    <div class="stages">
+      <div class="stage">
+  <div class="stage-h"><span class="snum">1</span><div><b>brain と web だけ（スマホ未接続）</b><div><span class="mod y">smabo-brain</span><span class="mod y">smabo-web</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp off">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="ghost" style="text-align:center;padding:6px">📱 smabo-app を<br>つなぐと、ここに<br>カメラが出ます</div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🩺 診断</span></div><div class="row">brain <b>接続</b></div><div class="row">phone <b style="color:var(--dim)">待機中</b></div><div class="pt" style="margin-top:6px">次にすること</div><div style="color:var(--dim)">smabo-app を起動して<br>brain のアドレスを入力</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:00:00</b> brain に接続 &nbsp; <i>09:00:01</i> phone 待機中</div></div>
+</div>
+  <ul class="adds"><li>何も無い画面にせず、次につなぐものを案内する（ガイドの次のノードと同じ）</li><li>使えるのは「診断」だけ</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">2</span><div><b>スマホだけ</b><div><span class="mod y">smabo-app</span><span class="mod y">顔</span><span class="mod y">スマホセンサ</span><span class="mod y">音声処理</span><span class="mod y">画像処理</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="cam"><div class="wall"></div><div class="wall b"></div><div class="det" style="left:44%;top:38%;width:16%;height:32%"><span>person</span></div><span class="live">camera</span><div class="seg"><span class="on">カメラ</span><span class="">GPS</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">💬 対話</span><span class="">🩺 診断</span></div><div class="face" style="padding:4px 0; gap:9px"><i style="width:10px;height:10px"></i><i style="width:10px;height:10px"></i></div><span class="btn">😊</span><span class="btn">😴</span><span class="btn">❤</span><div class="tog" style="margin-top:3px">目で見つめる</div><div class="log" style="font-size:8.5px"><span style="color:var(--cyan)">あなた ›</span> こんにちは<br><span style="color:var(--accent)">smabo ›</span> こんにちは</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:10:01</b> 🎤「こんにちは」 &nbsp; <b>09:10:02</b> 🔊「こんにちは」 &nbsp; <i>09:10:05</i> person 検出</div></div>
+</div>
+  <ul class="adds"><li><b>顔</b>：表情ボタン・視線パッド（対話モード）</li><li><b>スマホセンサ</b>：カメラ・IMU・GPS（メイン画面と診断）</li><li><b>音声処理</b>：会話ログ・発話入力・🎤</li><li><b>画像処理</b>：カメラに検出枠、「目で見つめる」</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">3</span><div><b>ESP32 をつないだ（機構はまだ）</b><div><span class="mod y">ベースパーツ</span><span class="mod y">smabo-esp32</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="cam"><div class="wall"></div><div class="wall b"></div><span class="live">camera</span><div class="seg"><span class="on">カメラ</span><span class="">GPS</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="">💬 対話</span><span class="on">🔧 調整</span><span class="">🩺 診断</span></div><div class="pt">ESP32 の機能</div><div class="tog off">servos</div><div class="tog off">dc_drive</div><div class="tog off">encoder_drive</div><div class="tog off">lidar</div><div style="color:var(--dim);margin-top:3px">部品をつけたらオンにする</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:20:00</b> esp32 接続 &nbsp; <i>09:20:03</i> config 読み込み</div></div>
+</div>
+  <ul class="adds"><li>ステータスバーに esp32 のランプ</li><li>「調整」モードが出て、ESP32 の設定（modes など）を変えられる</li><li>まだ動かせる部品は無いので、ほかの画面は 2 と同じ</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">4</span><div><b>首振りをつけた</b><div><span class="mod y">首振り</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);"><svg viewBox="0 0 200 110"><path d="M20 98 H180" stroke="var(--m-grid)"/><rect x="78" y="74" width="44" height="12" rx="3" fill="var(--m-body)" stroke="var(--m-body-edge)"/><rect x="94" y="74" width="12" height="8" fill="var(--orange)"/><path d="M84 60 A18 18 0 0 1 116 60" stroke="var(--orange)" fill="none" stroke-dasharray="2 2"/><rect x="88" y="34" width="24" height="40" rx="4" fill="var(--m-screen)" stroke="var(--cyan)" stroke-width="1.5"/><circle cx="96" cy="50" r="2.5" fill="var(--m-eye)"/><circle cx="104" cy="50" r="2.5" fill="var(--m-eye)"/></svg><div class="seg"><span>カメラ</span><span class="on">3D</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🕹 操作</span><span class="">💬 対話</span><span class="">🔧 調整</span><span class="">🩺</span></div><div class="pt">首</div><div class="row">head_pan <b>12°</b></div><div class="meter"><i style="width:56%;background:var(--orange)"></i></div><div class="row">head_tilt <b>-5°</b></div><div class="meter"><i style="width:45%;background:var(--orange)"></i></div><div class="tog">ランダムに動かす</div><div class="tog off">首で人を追う</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:30:00</b> servos オン &nbsp; <i>09:30:04</i> random motion 開始</div></div>
+</div>
+  <ul class="adds"><li>「操作」モードが出る（コントローラー制御・ランダム制御）</li><li>メイン画面に 3D ツイン（スマホ＋首）が選べるようになる</li><li>対話の「目で見つめる」に「首で人を追う」が加わる（画像処理による制御）</li><li>調整にサーボの範囲・中心の設定</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">5</span><div><b>ハンド・アームをつけた</b><div><span class="mod y">ハンド</span><span class="mod y">ロボットアーム</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);"><svg viewBox="0 0 200 110"><path d="M20 98 H180" stroke="var(--m-grid)"/><rect x="78" y="74" width="44" height="12" rx="3" fill="var(--m-body)" stroke="var(--m-body-edge)"/><rect x="88" y="34" width="24" height="40" rx="4" fill="var(--m-screen)" stroke="var(--cyan)" stroke-width="1.5"/><circle cx="96" cy="50" r="2.5" fill="var(--m-eye)"/><circle cx="104" cy="50" r="2.5" fill="var(--m-eye)"/><path d="M122 78 L140 62 L152 70" stroke="var(--orange)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="140" cy="62" r="2.5" fill="var(--orange)"/></svg><div class="seg"><span>カメラ</span><span class="on">3D</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🕹 操作</span><span class="">💬 対話</span><span class="">🔧 調整</span><span class="">🩺</span></div><div class="pt">アーム</div><div class="row">arm_1 <b>20°</b></div><div class="meter"><i style="width:60%;background:var(--orange)"></i></div><div class="row">arm_2 <b>-30°</b></div><div class="meter"><i style="width:33%;background:var(--orange)"></i></div><div class="pt">ハンド</div><div class="row">grip <b>開</b></div><div class="meter"><i style="width:80%;background:var(--orange)"></i></div><div class="tog off">ランダムに動かす</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:40:00</b> arm_1 → 20° &nbsp; <b>09:40:02</b> grip 開</div></div>
+</div>
+  <ul class="adds"><li>「操作」モードにアーム・ハンドのスライダー（コントローラー制御）</li><li>ハンドはランダム制御も（ガイドと同じ）</li><li>3D ツインにアームが出て、クリックでアームのパネルへ</li><li>首振りと同時につけていれば、首とアームが並ぶ</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">6</span><div><b>車輪をつけた（エンコーダ付まで）</b><div><span class="mod y">移動ロボット</span><span class="mod y">エンコーダ付</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="map"><svg viewBox="0 0 200 110"><g stroke="var(--m-grid2)"><path d="M0 30 H200 M0 60 H200 M0 90 H200 M50 0 V110 M100 0 V110 M150 0 V110"/></g><path d="M30 90 Q60 88 80 60 T140 30" stroke="var(--cyan)" fill="none" stroke-width="2"/><circle cx="140" cy="30" r="4" fill="var(--accent)"/></svg><div class="seg"><span class="">カメラ</span><span class="on">軌跡</span><span class="">3D</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🕹 操作</span><span class="">💬 対話</span><span class="">🔧 調整</span><span class="">🩺</span></div><div class="pt">走行</div><div class="joy" style="width:46px;height:46px"></div><div class="row">x,y <b>1.32, 0.40</b></div><div class="row">θ <b>-84°</b></div><div class="tog off">人についていく</div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>09:50:00</b> dc_drive オン &nbsp; <b>09:50:10</b> /cmd_vel 0.12 0.30</div></div>
+</div>
+  <ul class="adds"><li><b>移動ロボット</b>：「操作」にジョイスティック、対話に「人についていく」（画像処理による制御）</li><li><b>エンコーダ付</b>：位置（オドメトリ）と、メイン画面の「軌跡」</li><li>エンコーダが無いときは、軌跡と位置は出さない</li><li>調整に min_duty・速度上限</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">7</span><div><b>brain-ros＋ナビゲーション</b><div><span class="mod y">brain-ros</span><span class="mod y">ナビゲーション</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain-ros</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="map"><svg viewBox="0 0 200 110"><rect x="15" y="10" width="170" height="90" fill="none" stroke="var(--m-wall)" stroke-width="3"/><rect x="110" y="40" width="40" height="22" fill="var(--m-wall)"/><rect x="40" y="10" width="6" height="40" fill="var(--m-wall)"/><g fill="var(--accent)"><circle cx="20" cy="70" r="1.5"/><circle cx="20" cy="78" r="1.5"/><circle cx="108" cy="45" r="1.5"/><circle cx="108" cy="55" r="1.5"/></g><path d="M40 85 Q80 85 95 70 T165 30" stroke="var(--cyan)" fill="none" stroke-dasharray="4 3" stroke-width="2"/><circle cx="40" cy="85" r="4" fill="var(--accent)"/><path d="M165 22 L165 38 M157 30 L173 30" stroke="var(--green)" stroke-width="2"/></svg><div class="seg"><span class="">カメラ</span><span class="on">地図</span><span class="">3D</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🕹 操作</span><span class="">💬 対話</span><span class="">🔧 調整</span><span class="">🩺</span></div><div class="pt">ナビゲーション</div><span class="btn on">地図をクリックでゴール</span><span class="btn">初期位置</span><span class="btn">キャンセル</span><div class="row" style="margin-top:4px">残り <b>2.4 m</b></div><div class="pt" style="margin-top:4px">走行</div><div class="joy" style="width:36px;height:36px"></div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>10:00:00</b> rosbridge 接続 &nbsp; <i>10:00:12</i> Nav2 goal accepted</div></div>
+</div>
+  <ul class="adds"><li><b>brain-ros</b>：見た目はほぼ同じ。ランプが「brain-ros」になり、診断にトピック一覧と Hz</li><li><b>ナビゲーション</b>：メイン画面に「地図」（LiDAR スキャン付き）、「操作」にゴール指定</li><li>ナビゲーションはエンコーダ付＋brain-ros（＋LiDAR）が揃ったときだけ出る</li></ul>
+</div><div class="stage">
+  <div class="stage-h"><span class="snum">8</span><div><b>brain-ros＋動作計画</b><div><span class="mod y">brain-ros</span><span class="mod y">動作計画</span></div></div></div>
+  <div class="frame" style="grid-template-rows: 24px 1fr 26px; aspect-ratio: 16/10.5;">
+  <div class="bar" style="min-height:24px"><span class="logo">smabo</span><span class="lamp">brain-ros</span><span class="lamp">esp32</span><span class="lamp">phone</span><span class="estop" style="padding:1px 6px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 40%; gap:5px; padding:5px; min-height:0">
+    <div class="twin map" style="background: radial-gradient(ellipse at 50% 60%, var(--m-scene2), var(--m-scene) 70%);"><svg viewBox="0 0 200 110"><path d="M20 98 H180" stroke="var(--m-grid)"/><rect x="78" y="74" width="44" height="12" rx="3" fill="var(--m-body)" stroke="var(--m-body-edge)"/><rect x="88" y="34" width="24" height="40" rx="4" fill="var(--m-screen)" stroke="var(--cyan)" stroke-width="1.5"/><circle cx="96" cy="50" r="2.5" fill="var(--m-eye)"/><circle cx="104" cy="50" r="2.5" fill="var(--m-eye)"/><path d="M122 78 L140 62 L152 70" stroke="var(--orange)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="140" cy="62" r="2.5" fill="var(--orange)"/><path d="M122 78 L134 50 L150 46" stroke="var(--cyan)" stroke-width="4" fill="none" stroke-linecap="round" opacity=".45" stroke-dasharray="3 2"/></svg><div class="seg"><span>カメラ</span><span class="on">3D</span></div></div>
+    <div class="pnl"><div class="tabs" style="flex-wrap:wrap; margin-bottom:5px"><span class="on">🕹 操作</span><span class="">💬 対話</span><span class="">🔧 調整</span><span class="">🩺</span></div><div class="pt">動作計画</div><div style="color:var(--dim)">3D で目標の姿勢を<br>ドラッグ</div><span class="btn on">Plan</span><span class="btn">Execute</span><span class="btn">Home</span><div class="row">arm_1 <b>20° → 45°</b></div><div class="meter"><i style="width:60%;background:var(--orange)"></i></div></div>
+  </div>
+  <div class="pnl" style="margin:0 5px 5px; padding:3px 6px"><div class="log" style="font-size:8.5px; white-space:nowrap"><b>10:10:00</b> MoveIt plan 成功 (1.2 s) &nbsp; <i>10:10:03</i> execute</div></div>
+</div>
+  <ul class="adds"><li>3D ツインに目標の姿勢（半透明）と計画した軌道</li><li>「操作」のアームパネルに Plan / Execute</li><li>動作計画はロボットアーム＋brain-ros が揃ったときだけ出る</li></ul>
+</div>
+    </div>
+    <h3>まとめ: ノードごとに増えるもの</h3>
+    <div class="tablewrap"><table>
+      <tr><th>ロードマップのノード</th><th>ステータスバー</th><th>メイン画面</th><th>モード・パネル</th></tr>
+      <tr><td>smabo-brain / smabo-web</td><td>brain</td><td>案内のみ</td><td>🩺 診断</td></tr>
+      <tr><td>smabo-app</td><td>phone</td><td>カメラ・GPS</td><td>💬 対話</td></tr>
+      <tr><td>顔 / スマホセンサ / 音声処理 / 画像処理</td><td>—</td><td>検出枠</td><td>表情・視線 / センサー値 / 会話・🎤 / 見つめる</td></tr>
+      <tr><td>ベースパーツ＋smabo-esp32</td><td>esp32</td><td>—</td><td>🔧 調整（ESP32 の設定）</td></tr>
+      <tr><td>首振り</td><td>—</td><td>3D（首）</td><td>🕹 操作（首）、首で人を追う、ランダム</td></tr>
+      <tr><td>ハンド / ロボットアーム</td><td>—</td><td>3D（アーム）</td><td>🕹 操作（ハンド・アーム）、ランダム（ハンド）</td></tr>
+      <tr><td>移動ロボット</td><td>—</td><td>—</td><td>🕹 操作（走行）、人についていく</td></tr>
+      <tr><td>エンコーダ付</td><td>—</td><td>軌跡</td><td>位置（オドメトリ）</td></tr>
+      <tr><td>brain-ros</td><td>brain-ros</td><td>—</td><td>診断にトピック一覧</td></tr>
+      <tr><td>ナビゲーション</td><td>—</td><td>地図</td><td>ゴール指定</td></tr>
+      <tr><td>動作計画</td><td>—</td><td>3D に計画した軌道</td><td>Plan / Execute</td></tr>
+    </table></div>
+    <h3>ガイドと合わせると良いこと</h3>
+    <ul style="margin:4px 0 0; padding-left:1.2em">
+      <li>各ガイドの「動作手順」の確認を「smabo-web に○○が出て動けば OK」と書ける。今の encmobile のガイドにある「Config タブで encoder_drive を有効にし、two wheel mobile robot タブ…」のような、タブ名に依存した説明が要らなくなる。</li>
+      <li>ステータスバーの「構成」を押すと、ロードマップの図に今できているノードを色付けして出せる。次に何をつなぐと何が増えるかがそのままわかる。</li>
+      <li>ロードマップにノードを足す（例: 機械学習）ときは、ガイド 1 ページと機能モジュール 1 つを同時に足す、という決まりにできる。</li>
+    </ul>
+  </section>
+
+  <!-- ============================== Templates ============================== -->
+  <section class="concept" id="templates">
+    <div class="head"><span class="tag">テンプレート</span><h2>ガイドごとのテンプレートを一覧から選ぶ</h2></div>
+    <p class="one">画面の並べ方を「テンプレート」として複数用意し、一覧から選びます。標準のテンプレートは、smabo-web を使うガイド 1 つにつき 1 つ。ガイドの手順に出てくるものだけを、その手順で使う設定と一緒に並べます。パネルの大きさは境目をドラッグして変えられ、変えたものは「自分のテンプレート」として保存できます。</p>
+    <div class="frame" style="grid-template-rows: 30px 1fr; aspect-ratio: 16/10;">
+  <div class="bar"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span>
+    <span class="btn on">▦ テンプレート: 画像処理 ▾</span><span class="badge" style="position:static">1</span><span class="estop">■ 停止</span></div>
+  <div style="position:relative; padding:8px; min-height:0">
+    <div class="pnl" style="position:absolute; inset:8px; opacity:.25"></div>
+    <div class="pnl picker" style="position:absolute; inset:12px 6%; border-color:var(--cyan); display:grid; grid-template-rows:auto auto 1fr auto; gap:6px">
+      <div style="display:flex; gap:8px; align-items:center"><span class="pt" style="margin:0">テンプレート</span>
+        <div class="pnl" style="flex:1; padding:2px 7px; color:var(--dim)">🔍 さがす…</div>
+        <span class="btn on">ガイド順</span><span class="btn">使えるものだけ</span><span class="badge" style="position:static">2</span></div>
+      <div class="tabs"><span class="on">標準（ガイド）</span><span>自分のテンプレート (2)</span></div>
+      <div class="pkgrid"><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">smabo-web セットアップ</div><div class="pk-s">使える</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">smabo-app セットアップ</div><div class="pk-s">使える</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">smaboの顔</div><div class="pk-s">使える</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">スマホセンサ</div><div class="pk-s">使える</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">音声処理</div><div class="pk-s">使える</div></div><div class="pk on"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">画像処理</div><div class="pk-s">使用中</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">smabo-esp32 セットアップ</div><div class="pk-s">使える</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">首振り</div><div class="pk-s">使える</div></div><div class="pk off"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">ハンド</div><div class="pk-s">足りない: サーボ（ハンド）</div></div><div class="pk off"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">ロボットアーム</div><div class="pk-s">足りない: サーボ（アーム）</div></div><div class="pk"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">移動ロボット</div><div class="pk-s">使える</div></div><div class="pk off"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">エンコーダ付</div><div class="pk-s">足りない: エンコーダ</div></div><div class="pk off"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">ナビゲーション</div><div class="pk-s">足りない: brain-ros・LiDAR</div></div><div class="pk off"><div class="pk-th"><i></i><i></i><i></i></div><div class="pk-n">動作計画</div><div class="pk-s">足りない: brain-ros・アーム</div></div></div>
+      <div style="display:flex; gap:6px; justify-content:flex-end"><span class="btn">📖 ガイドを開く</span><span class="btn">複製して編集</span><span class="btn on">このテンプレートを開く</span><span class="badge" style="position:static">3</span></div>
+    </div>
+  </div>
+</div>
+    <ol class="callouts">
+      <li><b class="n">1</b><span>今のテンプレート名。押すと一覧が開く。⌘K からも名前で選べる。</span></li>
+      <li><b class="n">2</b><span>ガイドの順に並ぶ。今の構成で使えないものは薄く表示し、何が足りないかを書く。</span></li>
+      <li><b class="n">3</b><span>そのガイドを開くボタン。「複製して編集」で自分用のテンプレートを作れる。</span></li>
+    </ol>
+
+    <h3>標準テンプレート（ガイドごと）</h3>
+    <p style="color:var(--sub); font-size:14px">smabo-web を使わないガイド（smabo-brain・ベースパーツの作成・brain-ros のセットアップ）にはテンプレートを作らない。共通の起動手順（startup）の確認項目は、各セットアップのテンプレートに入れる。</p>
+    <div class="legend"><span class="lg-m">主役の表示（カメラ・3D・地図）</span><span class="lg-c">操作・表示パネル</span><span class="lg-s">そのガイドで使う設定</span></div>
+    <h3 class="phase-h">smabo-brain フェーズ</h3><div class="tgrid"><div class="tcard"><div class="tcard-h"><b>smabo-web セットアップ</b></div>
+  <div class="tmeta">ガイド: smabo-web.md　必要: <code>brain</code> </div>
+  <div class="thumb" style='grid-template-areas:"st st" "nx nx"; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-c" style="grid-area:st">接続状態</div><div class="tb tb-g" style="grid-area:nx">次の手順</div></div>
+  <ul class="tpanels"><li>brain との接続（ガイドの「Brain connected」を大きく表示）</li><li>次にやること（smabo-app をつなぐ）</li></ul></div><div class="tcard"><div class="tcard-h"><b>smabo-app セットアップ</b></div>
+  <div class="tmeta">ガイド: smabo-app.md　必要: <code>brain</code> <code>phone</code> </div>
+  <div class="thumb" style='grid-template-areas:"cam st" "cam nx"; grid-template-columns:1.6fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-m" style="grid-area:cam">カメラ</div><div class="tb tb-c" style="grid-area:st">接続状態</div><div class="tb tb-g" style="grid-area:nx">次の手順</div></div>
+  <ul class="tpanels"><li>brain・smabo-app の接続</li><li>カメラが届いているかの確認</li></ul></div><div class="tcard"><div class="tcard-h"><b>smaboの顔</b></div>
+  <div class="tmeta">ガイド: smabo_face.md　必要: <code>phone</code> </div>
+  <div class="thumb" style='grid-template-areas:"ex gz" "ex gz" "md gz"; grid-template-columns:1fr 1.3fr; grid-template-rows:1fr 1fr 0.6fr;'><div class="tb tb-c" style="grid-area:ex">表情（Expression）</div><div class="tb tb-m" style="grid-area:gz">視線パッド（Gaze）</div><div class="tb tb-s" style="grid-area:md">目のモード</div></div>
+  <ul class="tpanels"><li>表情の変更（Expression ID）</li><li>視線パッドで目を動かす</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>目のモード（Random / Follow）</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>スマホセンサ</b></div>
+  <div class="tmeta">ガイド: smabo_sensors.md　必要: <code>phone</code> </div>
+  <div class="thumb" style='grid-template-areas:"cam imu" "cam gps"; grid-template-columns:1.6fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-m" style="grid-area:cam">カメラ</div><div class="tb tb-c" style="grid-area:imu">IMU</div><div class="tb tb-c" style="grid-area:gps">GPS</div></div>
+  <ul class="tpanels"><li>カメラ・IMU・GPS をまとめて表示</li></ul></div><div class="tcard"><div class="tcard-h"><b>音声処理</b></div>
+  <div class="tmeta">ガイド: audioproc.md　必要: <code>phone</code> <code>stt</code> </div>
+  <div class="thumb" style='grid-template-areas:"log say" "log opt"; grid-template-columns:1.5fr 1fr; grid-template-rows:1.3fr 1fr;'><div class="tb tb-m" style="grid-area:log">会話ログ（Recognized speech）</div><div class="tb tb-c" style="grid-area:say">発話（SAY）</div><div class="tb tb-s" style="grid-area:opt">Bubble / Speak</div></div>
+  <ul class="tpanels"><li>音声認識の結果</li><li>文章を入力して発話</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>Bubble ON / Speak ON</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>画像処理</b></div>
+  <div class="tmeta">ガイド: imgproc.md　必要: <code>phone</code> </div>
+  <div class="thumb" style='grid-template-areas:"cam det" "cam bh"; grid-template-columns:1.6fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-m" style="grid-area:cam">カメラ＋検出枠</div><div class="tb tb-s" style="grid-area:det">Detection</div><div class="tb tb-c" style="grid-area:bh">Behaviors</div></div>
+  <ul class="tpanels"><li>検出枠つきのカメラ（Min size の枠も）</li><li>検出結果で目・首・車輪を動かす</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>Detection（enabled・Mode・Min size）</li><li>Behaviors（使える部品の分だけ）</li></ul></div></div></div><h3 class="phase-h">smabo-esp32 フェーズ</h3><div class="tgrid"><div class="tcard"><div class="tcard-h"><b>smabo-esp32 セットアップ</b></div>
+  <div class="tmeta">ガイド: smabo-esp32.md　必要: <code>esp32</code> </div>
+  <div class="thumb" style='grid-template-areas:"pg cf" "nx cf"; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-c" style="grid-area:pg">接続テスト（Ping）</div><div class="tb tb-s" style="grid-area:cf">ESP32 の設定</div><div class="tb tb-g" style="grid-area:nx">次の手順</div></div>
+  <ul class="tpanels"><li>WS（brain↔ESP32）と REST（web↔ESP32）の Ping</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>ESP32 の modes（まだ全部オフ）</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>首振り</b></div>
+  <div class="tmeta">ガイド: neck.md　必要: <code>esp32</code> <code>servos.head</code> </div>
+  <div class="thumb" style='grid-template-areas:"tw sv" "tw cf" "cam cf"; grid-template-columns:1.5fr 1fr; grid-template-rows:1fr 0.8fr 0.8fr;'><div class="tb tb-m" style="grid-area:tw">3D（スマホ＋首）</div><div class="tb tb-c" style="grid-area:sv">首のスライダー</div><div class="tb tb-s" style="grid-area:cf">head_pan の設定</div><div class="tb tb-m2" style="grid-area:cam">カメラ・首で追う</div></div>
+  <ul class="tpanels"><li>スライダーで首を動かす</li><li>ランダム制御</li><li>画像処理で首を動かす</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>head_pan の有効化・mode（manual / random）・group</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>ハンド</b></div>
+  <div class="tmeta">ガイド: hand.md　必要: <code>esp32</code> <code>servos.hand</code> </div>
+  <div class="thumb" style='grid-template-areas:"tw sv" "tw cf"; grid-template-columns:1.5fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-m" style="grid-area:tw">3D（ハンド）</div><div class="tb tb-c" style="grid-area:sv">左右のスライダー</div><div class="tb tb-s" style="grid-area:cf">left/right_hand の設定</div></div>
+  <ul class="tpanels"><li>スライダーで左右のハンドを動かす</li><li>ランダム制御</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>left_hand / right_hand の有効化・inverse・mode・group</li><li>random group の追加</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>ロボットアーム</b></div>
+  <div class="tmeta">ガイド: arm.md　必要: <code>esp32</code> <code>servos.arm</code> </div>
+  <div class="thumb" style='grid-template-areas:"tw sv" "tw cf"; grid-template-columns:1.5fr 1fr; grid-template-rows:1.2fr 1fr;'><div class="tb tb-m" style="grid-area:tw">3D（アーム）</div><div class="tb tb-c" style="grid-area:sv">関節 1〜4 のスライダー</div><div class="tb tb-s" style="grid-area:cf">arm_joint の設定</div></div>
+  <ul class="tpanels"><li>スライダーでアームを動かす</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>arm_joint_1〜4 の有効化・mode</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>移動ロボット</b></div>
+  <div class="tmeta">ガイド: mobile.md　必要: <code>esp32</code> <code>wheels</code> </div>
+  <div class="thumb" style='grid-template-areas:"cam js" "cam bh" "cf bh"; grid-template-columns:1.5fr 1fr; grid-template-rows:1fr 0.8fr 0.6fr;'><div class="tb tb-m" style="grid-area:cam">カメラ＋検出枠</div><div class="tb tb-c" style="grid-area:js">ジョイスティック</div><div class="tb tb-c" style="grid-area:bh">Drive follow</div><div class="tb tb-s" style="grid-area:cf">dc_drive</div></div>
+  <ul class="tpanels"><li>ジョイスティックで走らせる</li><li>物体についていく（Drive follow）</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>dc_drive の有効化</li><li>Detection・Target size</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>エンコーダ付移動ロボット</b></div>
+  <div class="tmeta">ガイド: encmobile.md　必要: <code>esp32</code> <code>wheels</code> <code>encoder</code> </div>
+  <div class="thumb" style='grid-template-areas:"tr od" "tr js" "tr cf"; grid-template-columns:1.6fr 1fr; grid-template-rows:1fr 1fr 0.6fr;'><div class="tb tb-m" style="grid-area:tr">軌跡（Trail Map）</div><div class="tb tb-c" style="grid-area:od">位置・速度</div><div class="tb tb-c" style="grid-area:js">ジョイスティック</div><div class="tb tb-s" style="grid-area:cf">encoder_drive</div></div>
+  <ul class="tpanels"><li>台車を手で動かして、位置と軌跡が変わるか確認</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>encoder_drive の有効化</li></ul></div></div></div><h3 class="phase-h">brain-ros フェーズ</h3><div class="tgrid"><div class="tcard"><div class="tcard-h"><b>ナビゲーション</b><span class="wip">ガイド執筆中</span></div>
+  <div class="tmeta">ガイド: nav.md　必要: <code>brain-ros</code> <code>wheels</code> <code>encoder</code> <code>lidar</code> </div>
+  <div class="thumb" style='grid-template-areas:"mp ng" "mp ng" "cam ng"; grid-template-columns:1.7fr 1fr; grid-template-rows:1fr 1fr 0.8fr;'><div class="tb tb-m" style="grid-area:mp">地図＋スキャン</div><div class="tb tb-c" style="grid-area:ng">ゴール指定</div><div class="tb tb-m2" style="grid-area:cam">カメラ</div></div>
+  <ul class="tpanels"><li>地図をクリックしてゴールを指定</li></ul><div class='tcfg'><b>この画面に出す設定</b><ul><li>速度上限など Nav2 の主な設定</li></ul></div></div><div class="tcard"><div class="tcard-h"><b>動作計画</b><span class="wip">ガイド執筆中</span></div>
+  <div class="tmeta">ガイド: plan.md　必要: <code>brain-ros</code> <code>servos.arm</code> </div>
+  <div class="thumb" style='grid-template-areas:"tw pl" "tw sv"; grid-template-columns:1.7fr 1fr; grid-template-rows:1fr 1fr;'><div class="tb tb-m" style="grid-area:tw">3D＋目標姿勢</div><div class="tb tb-c" style="grid-area:pl">Plan / Execute</div><div class="tb tb-s" style="grid-area:sv">関節の値</div></div>
+  <ul class="tpanels"><li>目標の姿勢を指定して計画・実行</li></ul></div></div>
+
+    <h3>テンプレートの中身（例: 首振り）</h3>
+    <pre class="code"><span class="c">// src/templates/neck.json（案）。大きさは比率で持つ</span>
+{
+  <span class="k">"id"</span>: <span class="s">"neck"</span>,
+  <span class="k">"name"</span>: <span class="s">"首振り"</span>,
+  <span class="k">"guide"</span>: <span class="s">"https://…/guides/neck.html"</span>,
+  <span class="k">"requires"</span>: [<span class="s">"esp32"</span>, <span class="s">"servos.head"</span>],
+  <span class="k">"layout"</span>: { <span class="k">"split"</span>: <span class="s">"row"</span>, <span class="k">"ratio"</span>: 0.6,
+    <span class="k">"a"</span>: { <span class="k">"split"</span>: <span class="s">"column"</span>, <span class="k">"ratio"</span>: 0.65,
+           <span class="k">"a"</span>: { <span class="k">"panel"</span>: <span class="s">"twin3d"</span> },
+           <span class="k">"b"</span>: { <span class="k">"panel"</span>: <span class="s">"camera"</span>, <span class="k">"props"</span>: { <span class="k">"behaviors"</span>: [<span class="s">"servo_follow"</span>] } } },
+    <span class="k">"b"</span>: { <span class="k">"split"</span>: <span class="s">"column"</span>, <span class="k">"ratio"</span>: 0.45,
+           <span class="k">"a"</span>: { <span class="k">"panel"</span>: <span class="s">"servo.sliders"</span>, <span class="k">"props"</span>: { <span class="k">"joints"</span>: [<span class="s">"head_pan"</span>, <span class="s">"head_tilt"</span>] } },
+           <span class="k">"b"</span>: { <span class="k">"panel"</span>: <span class="s">"config"</span>,  <span class="k">"props"</span>: { <span class="k">"keys"</span>: [<span class="s">"modes.servos.head_pan"</span>] } } } }
+}</pre>
+    <p class="caption">パネル（<code>servo.sliders</code>・<code>config</code> など）は共通の部品で、テンプレートは「どれを・どの設定項目だけ・どの比率で」並べるかだけを持つ。Config パネルは <code>keys</code> で表示する項目を絞れるので、ガイドで触る設定だけが出る。</p>
+
+    <h3>決まりごと</h3>
+    <ul style="margin:4px 0 0; padding-left:1.2em">
+      <li><b>標準テンプレートは書き換えない。</b>大きさや並びを変えたら「自分のテンプレート」として別に保存する。いつでも「標準に戻す」ができるので、ガイドの画面写真と食い違わない。</li>
+      <li><b>ガイドから直接開ける。</b>各ガイドに「smabo-web で開く」ボタンを置き、<code>http://localhost:5173/?template=neck</code> のようにテンプレートを指定して開く。ガイドの「Config タブの Modes/servos で…」のようなタブ名の説明が、「開いた画面の右下で…」で済む。</li>
+      <li><b>部品が足りないときも開ける。</b>使えないパネルは「○○が見つかりません（つなぎ方: ガイドの配線の節）」と表示して残す。ガイドを進めている途中で、まだ配線していない状態でも開けるようにするため。</li>
+      <li><b>テンプレートの追加はガイドの追加と同時に。</b>ロードマップにノード（例: 機械学習）を足すときは、ガイド 1 ページ・機能モジュール・テンプレート 1 つを同時に足す。</li>
+      <li><b>ふだん使い用のテンプレートも少し用意する。</b>ガイド用とは別に「全部入り」（おすすめ案 A+B+C の画面）と「デモ」くらいを置き、構成に合わせて使える方を最初に開く。</li>
+    </ul>
+  </section>
+
+  <!-- ============================== Theme ============================== -->
+  <section class="concept" id="theme">
+    <div class="head"><span class="tag">テーマ</span><h2>ダークモード・ライトモード</h2></div>
+    <p class="one">今の smabo-web はダークだけです。新しい UI では、OS の設定に合わせてダークとライトを切り替えます（ステータスバーのボタンで固定もできる）。このページも右上のボタンで切り替えられ、図の smabo-web も一緒に切り替わります。</p>
+    <div class="duo"><div><h4 style="margin:0 0 6px;font-size:14px">ダーク（今の配色をそのまま使う）</h4>
+<div class="frame th-dark" style="grid-template-rows: 26px 1fr 28px;">
+  <div class="bar" style="min-height:26px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span>
+    <span class="btn">☾ テーマ</span><span class="estop" style="padding:1px 7px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 38%; gap:6px; padding:6px; min-height:0">
+    <div style="display:grid; grid-template-rows: 1fr 38%; gap:6px; min-height:0">
+      <div class="cam"><div class="wall"></div><div class="wall b"></div><div class="det" style="left:44%;top:40%;width:15%;height:30%"><span>person</span></div><span class="live">camera</span></div>
+      <div class="map"><svg viewBox="0 0 200 70"><g stroke="var(--m-grid)"><path d="M0 23 H200 M0 46 H200 M50 0 V70 M100 0 V70 M150 0 V70"/></g><path d="M20 60 Q60 58 90 35 T180 12" stroke="var(--cyan)" fill="none" stroke-width="2"/><circle cx="180" cy="12" r="4" fill="var(--accent)"/></svg></div>
+    </div>
+    <div class="pnl"><div class="tabs" style="margin-bottom:5px"><span class="on">🕹 操作</span><span>💬 対話</span><span>🔧</span></div>
+      <div class="joy" style="width:50px;height:50px"></div>
+      <div class="row">lin <b>0.12 m/s</b></div><div class="row">ang <b>0.30</b></div>
+      <div class="row">arm_1 <b>20°</b></div><div class="meter"><i style="width:60%;background:var(--orange)"></i></div>
+      <div class="tog">dc_drive</div><div class="tog off">lidar</div></div>
+  </div>
+  <div class="pnl" style="margin:0 6px 6px; padding:3px 6px"><div class="log" style="white-space:nowrap"><b>10:20:01</b> 🎤「止まって」 &nbsp; <i>10:20:02</i> Nav2 canceled</div></div>
+</div></div><div><h4 style="margin:0 0 6px;font-size:14px">ライト（新しく用意する）</h4>
+<div class="frame th-light" style="grid-template-rows: 26px 1fr 28px;">
+  <div class="bar" style="min-height:26px"><span class="logo">smabo</span><span class="lamp">brain</span><span class="lamp">esp32</span><span class="lamp">phone</span>
+    <span class="btn">☀ テーマ</span><span class="estop" style="padding:1px 7px">■ 停止</span></div>
+  <div style="display:grid; grid-template-columns: 1fr 38%; gap:6px; padding:6px; min-height:0">
+    <div style="display:grid; grid-template-rows: 1fr 38%; gap:6px; min-height:0">
+      <div class="cam"><div class="wall"></div><div class="wall b"></div><div class="det" style="left:44%;top:40%;width:15%;height:30%"><span>person</span></div><span class="live">camera</span></div>
+      <div class="map"><svg viewBox="0 0 200 70"><g stroke="var(--m-grid)"><path d="M0 23 H200 M0 46 H200 M50 0 V70 M100 0 V70 M150 0 V70"/></g><path d="M20 60 Q60 58 90 35 T180 12" stroke="var(--cyan)" fill="none" stroke-width="2"/><circle cx="180" cy="12" r="4" fill="var(--accent)"/></svg></div>
+    </div>
+    <div class="pnl"><div class="tabs" style="margin-bottom:5px"><span class="on">🕹 操作</span><span>💬 対話</span><span>🔧</span></div>
+      <div class="joy" style="width:50px;height:50px"></div>
+      <div class="row">lin <b>0.12 m/s</b></div><div class="row">ang <b>0.30</b></div>
+      <div class="row">arm_1 <b>20°</b></div><div class="meter"><i style="width:60%;background:var(--orange)"></i></div>
+      <div class="tog">dc_drive</div><div class="tog off">lidar</div></div>
+  </div>
+  <div class="pnl" style="margin:0 6px 6px; padding:3px 6px"><div class="log" style="white-space:nowrap"><b>10:20:01</b> 🎤「止まって」 &nbsp; <i>10:20:02</i> Nav2 canceled</div></div>
+</div></div></div>
+    <h3>決まりごと</h3>
+    <ul style="margin:4px 0 0; padding-left:1.2em">
+      <li><b>最初は OS に合わせる。</b><code>prefers-color-scheme</code> に従い、「自動・ライト・ダーク」をステータスバーで選べる。選んだものはブラウザに保存する。</li>
+      <li><b>色は必ずトークン（CSS 変数）で書く。</b>今の <code>src/index.css</code> は <code>--bg</code> などのトークンを持っているので、ライト用の値を足せば大半は切り替わる。機能モジュールも直接色を書かない決まりにする。</li>
+      <li><b>canvas と 3D は別に対応が要る。</b>CSS 変数が効かないので、今は TrailMap・GazePad・Joystick・Plan・viewer3d（three.js）・Vision に色が直接書いてある。<code>getComputedStyle</code> でトークンを読み、テーマが変わったら描き直すようにする。</li>
+      <li><b>テーマで変えないもの。</b>カメラの映像、スマホの顔のプレビュー（スマホの画面そのもの）、緊急停止の赤。緊急停止はどちらのテーマでも一番目立つ色のままにする。</li>
+      <li><b>ライトでは色を少し濃くする。</b>シアン・オレンジ・赤は白い背景では薄く見えるので、文字に使っても読める濃さに下げる（このページのライトの値）。</li>
+      <li><b>使い分けの目安。</b>屋外や明るい展示会場でタブレットを使うときはライトが見やすい。夜や暗い部屋での実験はダーク。</li>
+      <li><b>ガイドの画面写真はダークで揃える。</b>テンプレートと同じく、ガイドに載せる写真は 1 つのテーマに決めておく。</li>
+    </ul>
+  </section>
+
+  <!-- ============================== Common ============================== -->
+  <section class="concept" id="common">
+    <div class="head"><span class="tag">共通</span><h2>どの案にも入れたいもの</h2></div>
+    <div class="cols" style="margin-top:16px">
+      <div>
+        <h3>ステータスバー</h3>
+        <div class="frame" style="aspect-ratio:auto; grid-template-rows: 36px;">
+          <div class="bar" style="min-height:36px"><span class="logo">smabo</span><span class="lamp">brain 9090</span><span class="lamp">esp32</span><span class="lamp warn">phone 再接続中</span><span class="sim">SIM</span><span class="estop">■ 緊急停止</span></div>
+        </div>
+        <p class="caption">ランプにカーソルを当てると、ホスト名や受信レート、最後に届いた時刻を出す。ホスト名の入力欄は設定にしまう。シミュレータにつないでいるときは SIM を表示する。</p>
+      </div>
+      <div>
+        <h3>コマンドパレット（⌘K）</h3>
+        <div class="frame" style="aspect-ratio:auto; padding:10px; display:block;">
+          <div class="pnl" style="border-color:var(--cyan)"><span style="color:var(--text)">› 表情</span><span style="color:var(--dim)">|</span></div>
+          <div class="pnl" style="margin-top:4px; border:none; background:transparent; padding:2px 7px; line-height:1.9">
+            <div style="background:var(--bg3);border-radius:4px;padding:0 6px">😊 表情: Smile</div>
+            <div style="color:var(--dim);padding:0 6px">😴 表情: Sleepy</div><div style="color:var(--dim);padding:0 6px">🗺 Nav2: ホームに戻る</div><div style="color:var(--dim);padding:0 6px">🔄 サーボを初期位置へ</div></div>
+        </div>
+        <p class="caption">キーボードだけで操作を呼び出す。開発中の「ちょっと試す」が速くなる。</p>
+      </div>
+      <div>
+        <h3>ブラウザのマイクで話しかける</h3>
+        <p>Web から直接 <code>/speech/audio</code> を送る。実機・シミュレータのどちらでも同じように使え、スマホがなくても音声認識を試せる。</p>
+      </div>
+      <div>
+        <h3>設定は使う場所の近くに</h3>
+        <p>Config タブにまとめず、走行の速度上限は走行パネルに、サーボの範囲はアームパネルに置く。保存先（ESP32 / brain）はラベルで示す。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== Compare ============================== -->
+  <section class="concept" id="compare">
+    <div class="head"><span class="tag">比較</span><h2>案ごとの向き不向き</h2></div>
+    <div class="tablewrap">
+    <table>
+      <tr><th>案</th><th>向いている場面</th><th>作る量</th><th>今のコードの再利用</th><th>デモ映え</th><th>狭い画面</th></tr>
+      <tr><td><b>A</b> コックピット</td><td>走らせながら全部見る</td><td class="dots">●●<s>●●●</s></td><td class="dots">●●●●<s>●</s></td><td class="dots">●●●<s>●●</s></td><td class="dots">●●<s>●●●</s></td></tr>
+      <tr><td><b>B</b> デジタルツイン</td><td>説明・デモ、アーム操作</td><td class="dots">●●●●<s>●</s></td><td class="dots">●●<s>●●●</s></td><td class="dots">●●●●●</td><td class="dots">●●●<s>●●</s></td></tr>
+      <tr><td><b>C</b> 目的別モード</td><td>人に使ってもらう、整理</td><td class="dots">●●<s>●●●</s></td><td class="dots">●●●●●</td><td class="dots">●●<s>●●●</s></td><td class="dots">●●●●<s>●</s></td></tr>
+      <tr><td><b>D</b> ダッシュボード</td><td>実験ごとに見るものが違う</td><td class="dots">●●●●●</td><td class="dots">●●●<s>●●</s></td><td class="dots">●●<s>●●●</s></td><td class="dots">●<s>●●●●</s></td></tr>
+      <tr><td><b>E</b> タブレット</td><td>屋外・展示で操縦</td><td class="dots">●●<s>●●●</s></td><td class="dots">●●<s>●●●</s></td><td class="dots">●●●●<s>●</s></td><td class="dots">●●●●●</td></tr>
+      <tr><td><b>A+B+C</b> おすすめ</td><td>開発もデモもこれ 1 つで</td><td class="dots">●●●●<s>●</s></td><td class="dots">●●●●<s>●</s></td><td class="dots">●●●●<s>●</s></td><td class="dots">●●●<s>●●</s></td></tr>
+    </table>
+    </div>
+    <p class="caption">「作る量」は多いほど大変。それ以外は多いほど良い。目安です。</p>
+  </section>
+</main>
+<script>
+(function () {
+  var root = document.documentElement, KEY = "smabo-ui-concepts-theme";
+  function apply(t) {
+    if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+    document.querySelectorAll(".themesw button").forEach(function (b) { b.classList.toggle("on", b.dataset.t === t); });
+  }
+  var saved = "auto";
+  try { saved = localStorage.getItem(KEY) || "auto"; } catch (e) {}
+  apply(saved);
+  document.querySelectorAll(".themesw button").forEach(function (b) {
+    b.addEventListener("click", function () { apply(b.dataset.t); try { localStorage.setItem(KEY, b.dataset.t); } catch (e) {} });
+  });
+})();
+</script>
+</body>
+</html>

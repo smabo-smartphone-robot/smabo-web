@@ -1,4 +1,5 @@
-export type ConnStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+// 'unpaired': the brain needs pairing (no token, or it no longer knows ours); no auto-reconnect.
+export type ConnStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'unpaired';
 
 export interface RosbridgeMsg {
   op: string;

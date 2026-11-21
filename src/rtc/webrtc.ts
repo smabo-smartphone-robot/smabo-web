@@ -11,6 +11,11 @@
  *   web → /webrtc/web_answer     : our answer
  *   web → /webrtc/web_ice        : our ICE candidates
  *   (brain's ICE candidates are bundled in the offer SDP — aiortc is non-trickle)
+ *
+ * The brain's web_offer reaches every open smabo-web (rosbridge broadcasts), so
+ * each tab sends a random `peer` id with preview / answer / ICE, and only takes an
+ * offer addressed to it (smabo-brain-ros stamps `peer`; smabo-brain sends offers
+ * to one socket only, without `peer`) and only while its preview is on.
  */
 
 type PublishFn = (topic: string, msg: Record<string, unknown>) => void;
@@ -19,6 +24,11 @@ type StreamCb  = (stream: MediaStream | null) => void;
 let _pc: RTCPeerConnection | null = null;
 let _publish: PublishFn | null = null;
 let _onStream: StreamCb | null = null;
+let _wanted = false;
+const RETRY_MS = 1000;
+const OFFER_TIMEOUT_MS = 10000;   // no offer by then → ask again (request lost, brain restarting)
+let _offerTimer: ReturnType<typeof setTimeout> | null = null;
+const PEER = `web-${Math.random().toString(36).slice(2, 10)}`;
 
 export function init(publish: PublishFn, onStream: StreamCb) {
   _publish  = publish;
@@ -27,8 +37,15 @@ export function init(publish: PublishFn, onStream: StreamCb) {
 
 /** Turn the brain→web video relay on or off. */
 export function setPreview(on: boolean) {
-  _publish?.('/webrtc/preview', { data: JSON.stringify({ on }) });
-  if (!on) {
+  _wanted = on;
+  _publish?.('/webrtc/preview', { data: JSON.stringify({ on, peer: PEER }) });
+  _clearOfferTimer();
+  if (on) {
+    _offerTimer = setTimeout(() => {
+      _offerTimer = null;
+      if (_wanted) setPreview(true);
+    }, OFFER_TIMEOUT_MS);
+  } else {
     _close();
     _onStream?.(null);
   }
@@ -36,6 +53,9 @@ export function setPreview(on: boolean) {
 
 /** Brain offered the relayed camera track → answer it. */
 export async function handleBrainOffer(dataJson: string) {
+  const data = JSON.parse(dataJson) as RTCSessionDescriptionInit & { peer?: string };
+  if (!_wanted || (data.peer !== undefined && data.peer !== PEER)) return;  // not ours
+  _clearOfferTimer();
   _close();
 
   _pc = new RTCPeerConnection({ iceServers: [] });
@@ -51,31 +71,46 @@ export async function handleBrainOffer(dataJson: string) {
           candidate: ev.candidate.candidate,
           sdpMid: ev.candidate.sdpMid,
           sdpMLineIndex: ev.candidate.sdpMLineIndex,
+          peer: PEER,
         }),
       });
     }
   };
 
-  _pc.onconnectionstatechange = () => {
-    if (_pc?.connectionState === 'failed' || _pc?.connectionState === 'closed') {
+  const pc = _pc;
+  pc.onconnectionstatechange = () => {
+    if (pc !== _pc) return;   // superseded by a newer offer
+    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
       _onStream?.(null);
+      // The brain drops a preview whose connection failed; while ours is still
+      // on, ask again (a new app stream is re-offered by the brain by itself).
+      if (_wanted) setTimeout(() => {
+        if (_wanted && pc === _pc) setPreview(true);
+      }, RETRY_MS);
     }
   };
 
-  const data = JSON.parse(dataJson) as RTCSessionDescriptionInit;
-  await _pc.setRemoteDescription(new RTCSessionDescription(data));
-  const answer = await _pc.createAnswer();
-  await _pc.setLocalDescription(answer);
+  await pc.setRemoteDescription(new RTCSessionDescription({ sdp: data.sdp, type: data.type }));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  if (pc !== _pc) return;
 
   _publish?.('/webrtc/web_answer', {
-    data: JSON.stringify({ sdp: answer.sdp, type: answer.type }),
+    data: JSON.stringify({ sdp: answer.sdp, type: answer.type, peer: PEER }),
   });
 }
 
 /** Called on brain disconnect: drop the peer (store resets previewOn). */
 export function close() {
+  _wanted = false;
+  _clearOfferTimer();
   _close();
   _onStream?.(null);
+}
+
+function _clearOfferTimer() {
+  if (_offerTimer !== null) clearTimeout(_offerTimer);
+  _offerTimer = null;
 }
 
 function _close() {

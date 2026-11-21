@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { useThemeColors } from '../theme';
 
 interface TrailMapProps {
   trail: { x: number; y: number }[];
@@ -13,6 +14,7 @@ const MAX_SCALE = 80; // px/m
 
 export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const colors = useThemeColors();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -21,7 +23,7 @@ export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0a0a1a';
+    ctx.fillStyle = colors.canvas;
     ctx.fillRect(0, 0, W, H);
 
     const cx = W / 2;
@@ -56,7 +58,7 @@ export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
     });
 
     // Origin cross
-    ctx.strokeStyle = '#1e3a5f';
+    ctx.strokeStyle = colors.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(cx - 10, cy);
@@ -67,7 +69,7 @@ export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
 
     // Trail
     if (trail.length > 1) {
-      ctx.strokeStyle = '#00bcd4';
+      ctx.strokeStyle = colors.cyan;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       const p0 = toCanvas(trail[0].x, trail[0].y);
@@ -88,8 +90,8 @@ export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
 
     ctx.save();
     ctx.translate(rp.px, rp.py);
-    ctx.strokeStyle = '#e94560';
-    ctx.fillStyle = '#e94560';
+    ctx.strokeStyle = colors.accent;
+    ctx.fillStyle = colors.accent;
     ctx.lineWidth = 2;
 
     // Body
@@ -116,14 +118,14 @@ export function TrailMap({ trail, robotTh, robotX, robotY }: TrailMapProps) {
     ctx.stroke();
 
     ctx.restore();
-  }, [trail, robotX, robotY, robotTh]);
+  }, [trail, robotX, robotY, robotTh, colors]);
 
   return (
     <canvas
       ref={canvasRef}
       width={W}
       height={H}
-      style={{ width: '100%', maxWidth: W, height: 'auto', display: 'block', borderRadius: 6, border: '1px solid #1e3a5f' }}
+      style={{ width: '100%', maxWidth: W, height: 'auto', display: 'block', borderRadius: 6, border: '1px solid var(--border)' }}
     />
   );
 }
