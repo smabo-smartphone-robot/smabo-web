@@ -1,5 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useThemeColors } from '../theme';
+import { shapeAxis } from './joystickCurve';
+import { keyTick } from './joystickKeys';
 
 interface JoystickProps {
   maxLin: number;
@@ -18,6 +20,7 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
   const stickRef = useRef({ x: 0, y: 0 }); // normalized -1..1
   const draggingRef = useRef(false);
   const keysRef = useRef({ w: false, a: false, s: false, d: false, space: false });
+  const keyDrivingRef = useRef(false);   // the keys moved the stick on the last tick
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
   const colors = useThemeColors();
@@ -206,11 +209,19 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
       }
     };
 
+    // the window lost focus with a key down: its keyup never comes, so let go of every key
+    const onBlur = () => {
+      const k = keysRef.current;
+      k.w = k.a = k.s = k.d = k.space = false;
+    };
+
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 
@@ -244,27 +255,29 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
 
       if (!draggingRef.current) {
         // Keyboard control
-        let nx = 0, ny = 0;
-        if (k.w) ny += 1;
-        if (k.s) ny -= 1;
-        if (k.a) nx -= 1;
-        if (k.d) nx += 1;
+        const t = keyTick(k, keyDrivingRef.current);
+        keyDrivingRef.current = t.driving;
 
-        if (nx !== 0 || ny !== 0) {
-          stickRef.current = { x: nx, y: ny };
+        if (t.driving) {
+          stickRef.current = { x: t.x, y: t.y };
           draw();
         } else if (stickRef.current.x !== 0 || stickRef.current.y !== 0) {
           stickRef.current = { x: 0, y: 0 };
           draw();
         }
+        if (t.stop) {           // the last key was released: stop now, not at cmd_timeout
+          onStopRef.current();
+          return;
+        }
       }
 
       const { x, y } = stickRef.current;
       if (x !== 0 || y !== 0) {
-        const lin = y * maxLinRef.current;
+        // dead zone + quadratic curve: small movements drive gently
+        const lin = shapeAxis(y) * maxLinRef.current;
         const effLin = Math.abs(y) < 0.2 ? 0 : lin; // spin zone: pure rotation when near-horizontal
         const angSign = effLin < 0 ? 1 : -1;          // reverse ang direction when reversing
-        onCmdRef.current(effLin, angSign * x * maxAngRef.current);
+        onCmdRef.current(effLin, angSign * shapeAxis(x) * maxAngRef.current);
       }
     }, 80);
 

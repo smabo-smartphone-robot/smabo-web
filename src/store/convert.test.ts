@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deepMerge, gpsFromMsg, imuFromMsg, odomFromMsg, toEuler } from './convert';
+import { addWheelVel, deepMerge, gpsFromMsg, imuFromMsg, odomFromMsg, toEuler, scanFromMsg } from './convert';
 
 const close = (a: number, b: number) => expect(a).toBeCloseTo(b, 6);
 
@@ -69,5 +69,47 @@ describe('message converters', () => {
     expect(gpsFromMsg({ ...base, position_covariance: [16, 0, 0, 0, 16, 0, 0, 0, 16] } as never).accuracy).toBe(4);
     expect(gpsFromMsg({ ...base, position_covariance: [-1] } as never).accuracy).toBeNull();
     expect(gpsFromMsg({ ...base, position_covariance: [] } as never).accuracy).toBeNull();
+  });
+});
+
+describe('addWheelVel', () => {
+  const r = 0.03, turn = 2 * Math.PI * r;
+
+  it('keeps the speeds and counts revolutions from speed × dt', () => {
+    let w = addWheelVel(null, { left: turn, right: -turn / 2, dt: 0.5 }, r);
+    w = addWheelVel(w, { left: turn, right: -turn / 2, dt: 0.5 }, r);
+    close(w.left, turn); close(w.right, -turn / 2);
+    close(w.revLeft, 1); close(w.revRight, -0.5);
+  });
+
+  it('counts nothing without a wheel radius', () => {
+    const w = addWheelVel(null, { left: 1, right: 1, dt: 1 }, 0);
+    expect([w.revLeft, w.revRight]).toEqual([0, 0]);
+  });
+});
+
+describe('scanFromMsg', () => {
+  const msg = {
+    header: { frame_id: 'laser' },
+    angle_min: 0, angle_increment: Math.PI / 2, range_min: 0.05, range_max: 12,
+    ranges: [1, 2, 0, 0.5, 0.01, NaN, 20],
+  };
+
+  it('turns valid ranges into x-forward / y-left points', () => {
+    const s = scanFromMsg(msg, 3);
+    // 0 rad → ahead, π/2 → left, (π skipped: 0 = no return), 3π/2 → right
+    expect(s.points).toHaveLength(3);
+    expect(s.points[0].x).toBeCloseTo(1); expect(s.points[0].y).toBeCloseTo(0);
+    expect(s.points[1].x).toBeCloseTo(0); expect(s.points[1].y).toBeCloseTo(2);
+    expect(s.points[2].x).toBeCloseTo(0); expect(s.points[2].y).toBeCloseTo(-0.5);
+    expect(s.rangeMax).toBe(2);
+    expect(s.frameId).toBe('laser');
+    expect(s.count).toBe(3);
+  });
+
+  it('copes with an empty scan', () => {
+    const s = scanFromMsg({ angle_min: 0, angle_increment: 0.1, ranges: [] });
+    expect(s.points).toEqual([]);
+    expect(s.rangeMax).toBe(0);
   });
 });

@@ -15,6 +15,20 @@ export interface OdomMsg {
   twist: { twist: { linear: Vec3; angular: Vec3 } };
 }
 
+/** smabo_interfaces/WheelVel: each wheel's speed (m/s) over the last `dt` seconds. */
+export interface WheelVelMsg { left: number; right: number; dt: number }
+
+/** sensor_msgs/LaserScan (the ESP32's LD06/LD19 driver; 0 = no return). */
+export interface LaserScanMsg {
+  header?: { frame_id?: string };
+  angle_min: number;
+  angle_max?: number;
+  angle_increment: number;
+  range_min?: number;
+  range_max?: number;
+  ranges: number[];
+}
+
 export interface ImuMsg {
   orientation: Quat;
   angular_velocity: Vec3;

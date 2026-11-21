@@ -12,6 +12,21 @@ import type { ConnStatus } from '../ws/types';
 
 type StatusHandler = (s: ConnStatus) => void;
 
+// "Connect ROS" is remembered until "Disconnect ROS", so a reload connects again
+// (a connection the server dropped stays remembered too).
+const KEEP_KEY = 'smabo-ros-connected';
+
+function keep(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(KEEP_KEY, '1');
+    else localStorage.removeItem(KEEP_KEY);
+  } catch { /* no storage: nothing to remember */ }
+}
+
+function kept(): boolean {
+  try { return localStorage.getItem(KEEP_KEY) === '1'; } catch { return false; }
+}
+
 class RosClient {
   private _ros: ROSLIB.Ros | null = null;
   private _status: ConnStatus = 'disconnected';
@@ -21,16 +36,32 @@ class RosClient {
   get isConnected(): boolean { return this._status === 'connected'; }
   get status(): ConnStatus { return this._status; }
 
-  /** Connect to ws://<host> (host already includes :9090 by default). */
+  /** Connect to ws://<host> (host already includes :9090 by default); while
+   *  connected or connecting, disconnect instead (the Connect / Disconnect button). */
   connect(host: string): void {
     if (this._ros && (this._status === 'connected' || this._status === 'connecting')) {
       this.disconnect();
       return;
     }
+    keep(true);
+    this._open(host);
+  }
+
+  /** On page load: connect again when ROS was connected before the reload. */
+  restore(host: string): void {
+    if (kept() && !this._ros) this._open(host);
+  }
+
+  private _open(host: string): void {
+    try { this._ros?.close(); } catch { /* ignore */ }   // a connection left in 'error'
     this._setStatus('connecting');
     const url = /^wss?:\/\//.test(host) ? host : `ws://${host}`;
     const ros = new ROSLIB.Ros({ url });
+    // A closed connection's events arrive later (its 'close' can come after the next
+    // connection is up); only the current connection may change the status.
+    const current = () => this._ros === ros;
     ros.on('connection', () => {
+      if (!current()) return;
       // roslib 1.4 does not dispatch rosbridge's action ops; route them by goal id
       // so sendActionGoal() gets its feedback / result.
       const sock = (ros as unknown as { socket?: WebSocket }).socket;
@@ -43,12 +74,17 @@ class RosClient {
       });
       this._setStatus('connected');
     });
-    ros.on('error', () => this._setStatus('error'));
-    ros.on('close', () => this._setStatus('disconnected'));
+    ros.on('error', () => { if (current()) this._setStatus('error'); });
+    ros.on('close', () => {
+      if (!current()) return;
+      this._ros = null;
+      this._setStatus('disconnected');
+    });
     this._ros = ros;
   }
 
   disconnect(): void {
+    keep(false);
     try { this._ros?.close(); } catch { /* ignore */ }
     this._ros = null;
     this._setStatus('disconnected');

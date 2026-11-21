@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBrain } from '../store/useBrain';
 import { brain } from '../ws/brain';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 export function Log() {
   const logs = useBrain(s => s.logs);
   const clearLogs = useBrain(s => s.clearLogs);
   const addSentLog = useBrain(s => s.addSentLog);
 
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = usePersistentState('log.filter', '');
   const [paused, setPaused] = useState(false);
-  const [sendText, setSendText] = useState('{"op":"publish","topic":"/test","msg":{}}');
+  const [sendText, setSendText] = usePersistentState('log.sendText', '{"op":"publish","topic":"/test","msg":{}}');
 
   const listRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(paused);

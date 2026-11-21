@@ -21,7 +21,10 @@ import {
   type UrdfModel, type SrdfModel,
 } from '../ros/robotModel';
 import type { ConnStatus } from '../ws/types';
+import { useModeState, useRobotDescription } from '../ros/useRosState';
+import { ModeBar } from '../components/ModeBar';
 import { useThemeColors, type ThemeColors } from '../theme';
+import { usePersistentState, isNumberRecord, isNumberRecordOf } from '../hooks/usePersistentState';
 
 const d2r = (d: number) => d * Math.PI / 180;
 const r2d = (r: number) => r * 180 / Math.PI;
@@ -157,12 +160,12 @@ export function Plan() {
   const [loadState, setLoadState] = useState('');
   const [urdf, setUrdf] = useState<UrdfModel | null>(null);
   const [srdf, setSrdf] = useState<SrdfModel | null>(null);
-  const [group, setGroup] = useState('arm');
-  const [goal, setGoal] = useState<Record<string, number>>({});        // rad
+  const [group, setGroup] = usePersistentState('plan.group', 'arm');
+  const [goal, setGoal] = usePersistentState<Record<string, number>>('plan.goal', {}, isNumberRecord);        // rad
   const [current, setCurrent] = useState<Record<string, number>>({});  // rad
-  const [params, setParams] = useState<Params>({ vel: 0.5, acc: 0.5, time: 5, attempts: 5 });
+  const [params, setParams] = usePersistentState<Params>('plan.params', { vel: 0.5, acc: 0.5, time: 5, attempts: 5 }, isNumberRecordOf(['vel', 'acc', 'time', 'attempts']));
   const [traj, setTraj] = useState<JointTrajectory | null>(null);
-  const [showTrail, setShowTrail] = useState(true);
+  const [showTrail, setShowTrail] = usePersistentState('plan.showTrail', true);
   const [ik, setIk] = useState<'idle' | 'ok' | 'fail'>('idle');
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -188,37 +191,15 @@ export function Plan() {
   const groupJoints = groupInfo?.joints ?? [];
   const ikGroup = srdf?.groups.find(g => g.tip);          // the chain group (arm) carries the IK tip
 
-  // ── load URDF / SRDF / meshes over rosbridge once connected ──
+  const modeState = useModeState(rosStatus);
+  const urdfText = useRobotDescription(rosStatus);
+  const planRunning = modeState?.mode === 'plan' && modeState.status === 'running';
+
+  // ── the 3D scene lives while connected ──
   useEffect(() => {
     if (rosStatus !== 'connected' || !viewerRef.current) return;
-    let alive = true;
     const s = createScene(viewerRef.current, colorsRef.current);
     s3d.current = s;
-    (async () => {
-      try {
-        setLoadState('loading robot_description…');
-        const model = parseUrdf(await getText('robot_description'));
-        setLoadState('loading robot_description_semantic…');
-        const sem = parseSrdf(await getText('robot_description_semantic'), model);
-        const meshes = await loadMeshes(model, (d, n) => setLoadState(`loading meshes ${d}/${n}…`));
-        if (!alive) return;
-        s.current = new RobotObject(model, meshes, 'solid');
-        s.goal = new RobotObject(model, meshes, 'goal');
-        s.trail = new RobotObject(model, meshes, 'trail');
-        s.rosFrame.add(s.current.root, s.goal.root, s.trail.root);
-        s.trail.visible = false;
-        s.current.setJoints(currentRef.current);
-        setUrdf(model);
-        setSrdf(sem);
-        setGroup(g => (sem.groups.some(x => x.name === g) ? g : sem.groups[0]?.name ?? ''));
-        const zero = Object.fromEntries(model.joints.filter(j => j.type !== 'fixed').map(j => [j.name, 0]));
-        setGoal(g => ({ ...zero, ...currentRef.current, ...g }));
-        setLoadState('');
-        say(`model loaded: ${model.links.size} links, groups ${sem.groups.map(g => g.name).join(', ')}`);
-      } catch (e) {
-        setLoadState(`load failed: ${(e as Error).message}`);
-      }
-    })();
 
     // render loop (+ planned-path animation)
     let raf = 0;
@@ -238,14 +219,56 @@ export function Plan() {
     };
     loop();
     return () => {
-      alive = false;
       cancelAnimationFrame(raf);
       s.dispose();
       s3d.current = null;
-      setUrdf(null);
-      setSrdf(null);
     };
-  }, [rosStatus, say]);
+  }, [rosStatus]);
+
+  // ── the robot: rebuilt whenever the URDF changes (mode_manager swaps it per mode);
+  //    the SRDF (planning groups) only exists while move_group runs ──
+  useEffect(() => {
+    const s = s3d.current;
+    const clear = () => {
+      if (!s) return;
+      for (const k of ['current', 'goal', 'trail'] as const) {
+        const r = s[k];
+        if (r) { s.rosFrame.remove(r.root); s[k] = undefined; }
+      }
+    };
+    if (!s || !urdfText) { clear(); setUrdf(null); setSrdf(null); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const model = parseUrdf(urdfText);
+        let sem: SrdfModel = { groups: [], states: [] };
+        if (planRunning) {
+          setLoadState('loading robot_description_semantic…');
+          sem = parseSrdf(await getText('robot_description_semantic'), model);
+        }
+        const meshes = await loadMeshes(model, (d, n) => { if (alive) setLoadState(`loading meshes ${d}/${n}…`); });
+        if (!alive) return;
+        clear();
+        s.current = new RobotObject(model, meshes, 'solid');
+        s.goal = new RobotObject(model, meshes, 'goal');
+        s.trail = new RobotObject(model, meshes, 'trail');
+        s.rosFrame.add(s.current.root, s.goal.root, s.trail.root);
+        s.trail.visible = false;
+        s.goal.visible = planRunning;
+        s.current.setJoints(currentRef.current);
+        setUrdf(model);
+        setSrdf(sem);
+        setGroup(g => (sem.groups.some(x => x.name === g) ? g : sem.groups[0]?.name ?? ''));
+        const zero = Object.fromEntries(model.joints.filter(j => j.type !== 'fixed').map(j => [j.name, 0]));
+        setGoal(g => ({ ...zero, ...currentRef.current, ...g }));
+        setLoadState('');
+        say(`model loaded: ${model.links.size} links${sem.groups.length ? `, groups ${sem.groups.map(g => g.name).join(', ')}` : ''}`);
+      } catch (e) {
+        if (alive) setLoadState(`load failed: ${(e as Error).message}`);
+      }
+    })();
+    return () => { alive = false; };
+  }, [urdfText, planRunning, rosStatus, say]);
 
   // ── current state ──
   useEffect(() => {
@@ -411,7 +434,7 @@ export function Plan() {
   const jointLimits = (j: string) => urdf?.joints.find(x => x.name === j);
   const states = srdf?.states.filter(s => s.group === group) ?? [];
   const connected = rosStatus === 'connected';
-  const ready = connected && !!urdf;
+  const ready = connected && !!urdf && planRunning && !!srdf?.groups.length;
 
   return (
     <div className="nav-layout">
@@ -424,6 +447,7 @@ export function Plan() {
           <span className={`dot ${rosStatus}`} title={rosStatus} />
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
+        <ModeBar want="plan" rosStatus={rosStatus} state={modeState} />
         {loadState && <div className="nav-status">{loadState}</div>}
 
         <div className="card-title">Planning group</div>

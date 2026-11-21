@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { phone } from '../../ws/esp32';
 import { useBrain } from '../../store/useBrain';
 import { InlineStr, SectionHeader } from './fields';
+import { usePersistentState, isNumberOrNull } from '../../hooks/usePersistentState';
 
 interface Field {
   key: string;
@@ -114,8 +115,8 @@ export function ExpressionEditor() {
 
   const [schema, setSchema] = useState<Schema | null>(null);
   const [exprs, setExprs] = useState<Expr[]>([]);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [showOnPhone, setShowOnPhone] = useState(true);
+  const [selected, setSelected] = usePersistentState<number | null>('expr.selected', null, isNumberOrNull);
+  const [showOnPhone, setShowOnPhone] = usePersistentState('expr.showOnPhone', true);
   const [rev, setRev] = useState(0);          // bumped when the preview should be re-fetched
   const [previewFailed, setPreviewFailed] = useState(false);
   const [previewSrc, setPreviewSrc] = useState('');

@@ -7,6 +7,9 @@ import { PhoneSettings } from './config/PhoneSettings';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config/fields';
 import { RandomGroupSettings } from './config/RandomGroupSettings';
 import { ServoTable } from './config/ServoTable';
+import { driveModes, driveView } from './config/driveModes';
+import { Details } from '../components/Details';
+import { HintIcon } from '../components/HintIcon';
 
 
 // ── main ─────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ export function Config() {
 
   const patch = (p: Record<string, unknown>) => patchConfig(p);
   const sendMode = (m: Record<string, unknown>) => setMode(m);
+  const drive = driveView(modes);
 
   // Stage helpers for Advanced section
   type MergeSetFn = (prev: Record<string, unknown>) => Record<string, unknown>;
@@ -101,12 +105,12 @@ export function Config() {
       </div>
 
       {/* ── Modes ───────────────────────────────────── */}
-      <details open>
+      <Details id="config.modes" defaultOpen>
         <summary>Modes</summary>
         <div className="config-section">
 
           {/* servos */}
-          <details>
+          <Details id="config.servos">
             <summary>
               <span style={{ flex: 1 }}>servos</span>
               <input type="checkbox" checked={b(modes['servos'])}
@@ -145,15 +149,16 @@ export function Config() {
               }}>+ Add servo</button>
               <RandomGroupSettings rgroups={rgroups} patch={patch} />
             </div>
-          </details>
+          </Details>
 
-          {/* dc_drive */}
-          <details>
+          {/* dc_drive, with the encoders as an option (= encoder_drive on the ESP32):
+              the dc settings apply with or without them */}
+          <Details id="config.dc_drive">
             <summary>
               <span style={{ flex: 1 }}>dc_drive</span>
-              <input type="checkbox" checked={b(modes['dc_drive'])}
+              <input type="checkbox" checked={drive.dc}
                 onClick={e => e.stopPropagation()}
-                onChange={e => sendMode({ ...modes, dc_drive: e.target.checked })} />
+                onChange={e => sendMode(driveModes(modes, e.target.checked, drive.encoder))} />
             </summary>
             <div className="config-section">
               <div style={fg2}>
@@ -171,23 +176,26 @@ export function Config() {
                 <InlineNum value={n(dc['cmd_timeout'], 0.5)} w={60} onChange={v => patch({ dc: { cmd_timeout: v } })} />
                 <span style={lbl} title="0 以外の指令の duty をこの値まで引き上げる（静止摩擦対策、0 = 無効）">min_duty (0-1)</span>
                 <InlineNum value={n(dc['min_duty'], 0)} w={60} onChange={v => patch({ dc: { min_duty: v } })} />
+                <span style={lbl}>
+                  trim{' '}
+                  <HintIcon label="trim の説明">
+                    直進したときの左右差の補正。まっすぐ走らせて右に寄るなら正、左に寄るなら負（0.01 = 1 %）。
+                    正にすると左の車輪が遅く、右の車輪が速くなります。
+                    目安は 0.13 × 横ずれ(m) ÷ 走った距離(m)²（例: 1 m 走って 5 cm 右に寄ったら 0.0065）。
+                  </HintIcon>
+                </span>
+                <InlineNum value={n(dc['trim'], 0)} w={60} onChange={v => patch({ dc: { trim: v } })} />
                 <span style={lbl}>invert_left</span>
                 <input type="checkbox" checked={b(dc['invert_left'])} onChange={e => patch({ dc: { invert_left: e.target.checked } })} />
                 <span style={lbl}>invert_right</span>
                 <input type="checkbox" checked={b(dc['invert_right'])} onChange={e => patch({ dc: { invert_right: e.target.checked } })} />
               </div>
-            </div>
-          </details>
-
-          {/* encoder_drive */}
-          <details>
-            <summary>
-              <span style={{ flex: 1 }}>encoder_drive</span>
-              <input type="checkbox" checked={b(modes['encoder_drive'])}
-                onClick={e => e.stopPropagation()}
-                onChange={e => sendMode({ ...modes, encoder_drive: e.target.checked })} />
-            </summary>
-            <div className="config-section">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 8px',
+                opacity: drive.dc ? 1 : 0.5 }}>
+                <input type="checkbox" checked={drive.encoder} disabled={!drive.dc}
+                  onChange={e => sendMode(driveModes(modes, true, e.target.checked))} />
+                encoder
+              </label>
               <div style={fg2}>
                 <span style={lbl}>cpr (counts/rev)</span>
                 <InlineNum value={n(enc['cpr'], 1320)} isInt w={60} onChange={v => patch({ encoder: { cpr: v } })} />
@@ -217,10 +225,10 @@ export function Config() {
                 <InlineNum value={n(encCov['twist_ww'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { twist_ww: v } } })} />
               </div>
             </div>
-          </details>
+          </Details>
 
           {/* lidar */}
-          <details>
+          <Details id="config.lidar">
             <summary>
               <span style={{ flex: 1 }}>lidar</span>
               <input type="checkbox" checked={b(modes['lidar'])}
@@ -248,15 +256,20 @@ export function Config() {
                 <InlineNum value={n(lidar['range_min'], 0.05)} w={60} onChange={v => patch({ lidar: { range_min: v } })} />
                 <span style={lbl}>range_max (m)</span>
                 <InlineNum value={n(lidar['range_max'], 12.0)} w={60} onChange={v => patch({ lidar: { range_max: v } })} />
+                <span style={lbl}>angle_offset (deg)</span>
+                <InlineNum value={n(lidar['angle_offset'], 0)} w={60} onChange={v => patch({ lidar: { angle_offset: v } })} />
+                <span style={lbl}>clockwise</span>
+                <input type="checkbox" checked={b(lidar['clockwise'], true)}
+                  onChange={e => patch({ lidar: { clockwise: e.target.checked } })} />
               </div>
             </div>
-          </details>
+          </Details>
 
         </div>
-      </details>
+      </Details>
 
       {/* ── Advanced ─────────────────────────────────── */}
-      <details>
+      <Details id="config.advanced">
         <summary>Advanced – pins / bus / WiFi ⚠️ reboot</summary>
         <div className="config-section">
           <div style={{ color: 'var(--orange)', fontSize: '.72rem', marginBottom: 6 }}>
@@ -336,18 +349,18 @@ export function Config() {
             >Discard</button>
           </div>
         </div>
-      </details>
+      </Details>
 
       {/* ── Phone (smabo-app): its own REST API ─────── */}
       <PhoneSettings />
 
       {/* ── Full config JSON ─────────────────────────── */}
-      <details>
+      <Details id="config.json">
         <summary>Full ESP32 config (JSON)</summary>
         <div className="config-section">
           <pre className="config-full-json">{JSON.stringify(esp32Config, null, 2)}</pre>
         </div>
-      </details>
+      </Details>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { brain } from '../ws/brain';
 import { useBrain } from '../store/useBrain';
 import { GazePad } from '../components/GazePad';
 import { arr, rec } from './config/fields';
+import { usePersistentState, isStrings } from '../hooks/usePersistentState';
 
 export type FaceSection = 'speech' | 'gaze' | 'expression' | 'say';
 
@@ -10,8 +11,8 @@ export type FaceSection = 'speech' | 'gaze' | 'expression' | 'say';
 export function Face({ sections }: { sections?: FaceSection[] } = {}) {
   const show = (k: FaceSection) => !sections || sections.includes(k);
   const [sayText, setSayText] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
-  const [exprName, setExprName] = useState('');
+  const [history, setHistory] = usePersistentState<string[]>('face.history', [], isStrings);
+  const [exprName, setExprName] = usePersistentState('face.exprName', '');
 
   const recognized = useBrain(s => s.recognized);
   const clearRecognized = useBrain(s => s.clearRecognized);

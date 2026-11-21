@@ -5,6 +5,7 @@ import { Joystick } from '../components/Joystick';
 import { ControlBar, useControlLocked } from '../components/ControlBar';
 import { TrailMap } from '../components/TrailMap';
 import { useDragOrder } from '../hooks/useDragOrder';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const DRIVE_PANELS = ['telem', 'joystick', 'trail'] as const;
 type DP = (typeof DRIVE_PANELS)[number];
@@ -16,6 +17,8 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const odom = useBrain(s => s.odom);
   const trail = useBrain(s => s.trail);
   const clearTrail = useBrain(s => s.clearTrail);
+  const wheel = useBrain(s => s.wheel);
+  const resetWheel = useBrain(s => s.resetWheel);
   const visionConfig = useBrain(s => s.visionConfig);
   const visionDriveActive = !!(
     visionConfig?.enabled &&
@@ -25,8 +28,8 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const { sort, handleProps, dropProps } = useDragOrder('smabo-drive-order');
   const controlLocked = useControlLocked();
 
-  const [maxLin, setMaxLin] = useState(0.3);
-  const [maxAng, setMaxAng] = useState(1.0);
+  const [maxLin, setMaxLin] = usePersistentState('drive.maxLin', 0.3);
+  const [maxAng, setMaxAng] = usePersistentState('drive.maxAng', 1.0);
   const [cmdLin, setCmdLin] = useState(0);
   const [cmdAng, setCmdAng] = useState(0);
 
@@ -84,6 +87,29 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
             <div className="telem-row">
               <span className="telem-label">θ</span>
               <span className="telem-val">{odom ? fmt(odom.th, 1) : '--'} °</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Wheels /wheel_vel</span>
+              <button onClick={resetWheel} style={{ fontSize: '.7rem', padding: '2px 8px' }}>Reset</button>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">L</span>
+              <span className="telem-val">{wheel ? fmt(wheel.left) : '--'} m/s</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">R</span>
+              <span className="telem-val">{wheel ? fmt(wheel.right) : '--'} m/s</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">L rev</span>
+              <span className="telem-val">{wheel ? fmt(wheel.revLeft, 2) : '--'}</span>
+            </div>
+            <div className="telem-row">
+              <span className="telem-label">R rev</span>
+              <span className="telem-val">{wheel ? fmt(wheel.revRight, 2) : '--'}</span>
             </div>
           </div>
 
