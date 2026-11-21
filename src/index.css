@@ -1206,6 +1206,28 @@ details[open] > summary::before {
   border-color: var(--accent);
 }
 
+/* the view plus the pointer's coordinates on top of it */
+.nav-viewer-box {
+  flex: 1;
+  display: flex;
+  position: relative;
+  min-height: 320px;
+}
+.nav-hover {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg3) 85%, transparent);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  pointer-events: none;
+}
+
 .nav-viewer-title {
   display: flex;
   align-items: center;
@@ -1223,6 +1245,62 @@ details[open] > summary::before {
   border-color: var(--cyan);
   color: var(--cyan);
 }
+
+/* SLAM / Navigation sub-tabs inside the Navigation tab */
+.nav-subtabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.nav-subtabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  padding: 6px 0;
+  font-weight: 600;
+}
+.nav-subtabs button + button { border-left: 1px solid var(--border); }
+.nav-subtabs button.active {
+  background: var(--bg3);
+  color: var(--cyan);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+/* "stop the other one?" before switching between SLAM and Navigation */
+.nav-confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--orange);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  font-size: .75rem;
+  line-height: 1.4;
+}
+
+/* layer switches, folded into the view's top-right corner */
+.nav-display {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg3) 88%, transparent);
+  border: 1px solid var(--border);
+  font-size: .72rem;
+}
+.nav-display summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.nav-display .nav-layers { margin-top: 4px; }
 
 .nav-layers {
   display: grid;

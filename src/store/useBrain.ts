@@ -9,6 +9,12 @@ import { pendingPing, registerBrainHandlers } from './brainHandlers';
 
 const ESP32_HOST_KEY = 'smabo-esp32-host';
 const PHONE_HOST_KEY = 'smabo-phone-host';
+const BRAIN_HOST_KEY = 'smabo-brain-host';
+const DEFAULT_BRAIN_HOST = 'smabo-brain.local:9090';
+
+function storedBrainHost(): string {
+  try { return localStorage.getItem(BRAIN_HOST_KEY) || DEFAULT_BRAIN_HOST; } catch { return DEFAULT_BRAIN_HOST; }
+}
 
 interface LogEntry {
   id: number;
@@ -135,7 +141,7 @@ export const useBrain = create<BrainStore>((set, get) => {
 
   return {
     status: 'disconnected',
-    host: 'smabo-brain.local:9090',
+    host: storedBrainHost(),
     esp32Host: initialEsp32Host,
     msgRate: 0,
 
@@ -171,7 +177,10 @@ export const useBrain = create<BrainStore>((set, get) => {
     logs: [],
     toasts: [],
 
-    setHost: (h) => set({ host: h }),
+    setHost: (h) => {
+      try { localStorage.setItem(BRAIN_HOST_KEY, h); } catch { /* no storage */ }
+      set({ host: h });
+    },
 
     connect: () => {
       const { host, status } = get();

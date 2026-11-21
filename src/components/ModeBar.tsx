@@ -25,11 +25,12 @@ export function ModeBar({ want, rosStatus, state }: { want: 'nav' | 'plan'; rosS
   const ready = rosStatus === 'connected' && !!state && !busy;
   const mine = state?.mode === want && state.status === 'running';
   const other = state && state.mode !== 'none' && state.mode !== want ? MODE_NAME[state.mode] : '';
+  const start = () => sendModeCommand({ op: 'start', mode: want });
   return (
     <div className="mode-bar">
       <span className="mode-dot" style={{ background: TONE_COLOR[tone] }} />
       <span className="mode-text" title={state?.message}>{text}</span>
-      <button onClick={() => sendModeCommand({ op: 'start', mode: want })} disabled={!ready || mine}
+      <button onClick={start} disabled={!ready || mine}
         title={other ? `stops ${other} first` : undefined}>
         Start {MODE_NAME[want]}
       </button>

@@ -5,6 +5,7 @@ import { Joystick } from '../components/Joystick';
 import { ControlBar, useControlLocked } from '../components/ControlBar';
 import { TrailMap } from '../components/TrailMap';
 import { useDragOrder } from '../hooks/useDragOrder';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const DRIVE_PANELS = ['telem', 'joystick', 'trail'] as const;
 type DP = (typeof DRIVE_PANELS)[number];
@@ -27,8 +28,8 @@ export function Drive({ sections }: { sections?: DriveSection[] } = {}) {
   const { sort, handleProps, dropProps } = useDragOrder('smabo-drive-order');
   const controlLocked = useControlLocked();
 
-  const [maxLin, setMaxLin] = useState(0.3);
-  const [maxAng, setMaxAng] = useState(1.0);
+  const [maxLin, setMaxLin] = usePersistentState('drive.maxLin', 0.3);
+  const [maxAng, setMaxAng] = usePersistentState('drive.maxAng', 1.0);
   const [cmdLin, setCmdLin] = useState(0);
   const [cmdAng, setCmdAng] = useState(0);
 

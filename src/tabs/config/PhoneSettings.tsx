@@ -6,6 +6,7 @@ import React from 'react';
 import { useBrain } from '../../store/useBrain';
 import { ExpressionEditor } from './ExpressionEditor';
 import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './fields';
+import { Details } from '../../components/Details';
 
 const lbl: React.CSSProperties = { fontSize: '.75rem', color: 'var(--dim)', whiteSpace: 'nowrap' };
 const grid: React.CSSProperties = {
@@ -38,7 +39,7 @@ export function PhoneSettings() {
   ];
 
   return (
-    <details open>
+    <Details id="phone" defaultOpen>
       <summary>
         <span style={{ flex: 1 }}>Phone (smabo-app)</span>
         {cfg && <span style={lbl}>{s(app['name'])} {s(app['version'])}</span>}
@@ -114,23 +115,23 @@ export function PhoneSettings() {
               </span>
             </div>
 
-            <details>
+            <Details id="phone.expressions">
               <summary>Edit expressions</summary>
               <div className="config-section">
                 <ExpressionEditor />
               </div>
-            </details>
+            </Details>
 
             <div className="expr-hint">
               Brain: {s(brainCfg['host'])}:{n(brainCfg['port'])} (change it on the phone).
             </div>
-            <details>
+            <Details id="phone.json">
               <summary>Full phone settings (JSON)</summary>
               <pre className="config-full-json">{JSON.stringify(cfg, null, 2)}</pre>
-            </details>
+            </Details>
           </>
         )}
       </div>
-    </details>
+    </Details>
   );
 }

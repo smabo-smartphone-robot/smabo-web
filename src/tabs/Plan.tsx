@@ -24,6 +24,7 @@ import type { ConnStatus } from '../ws/types';
 import { useModeState, useRobotDescription } from '../ros/useRosState';
 import { ModeBar } from '../components/ModeBar';
 import { useThemeColors, type ThemeColors } from '../theme';
+import { usePersistentState, isNumberRecord, isNumberRecordOf } from '../hooks/usePersistentState';
 
 const d2r = (d: number) => d * Math.PI / 180;
 const r2d = (r: number) => r * 180 / Math.PI;
@@ -159,12 +160,12 @@ export function Plan() {
   const [loadState, setLoadState] = useState('');
   const [urdf, setUrdf] = useState<UrdfModel | null>(null);
   const [srdf, setSrdf] = useState<SrdfModel | null>(null);
-  const [group, setGroup] = useState('arm');
-  const [goal, setGoal] = useState<Record<string, number>>({});        // rad
+  const [group, setGroup] = usePersistentState('plan.group', 'arm');
+  const [goal, setGoal] = usePersistentState<Record<string, number>>('plan.goal', {}, isNumberRecord);        // rad
   const [current, setCurrent] = useState<Record<string, number>>({});  // rad
-  const [params, setParams] = useState<Params>({ vel: 0.5, acc: 0.5, time: 5, attempts: 5 });
+  const [params, setParams] = usePersistentState<Params>('plan.params', { vel: 0.5, acc: 0.5, time: 5, attempts: 5 }, isNumberRecordOf(['vel', 'acc', 'time', 'attempts']));
   const [traj, setTraj] = useState<JointTrajectory | null>(null);
-  const [showTrail, setShowTrail] = useState(true);
+  const [showTrail, setShowTrail] = usePersistentState('plan.showTrail', true);
   const [ik, setIk] = useState<'idle' | 'ok' | 'fail'>('idle');
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);

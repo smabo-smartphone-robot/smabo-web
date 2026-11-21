@@ -11,18 +11,25 @@ import type { ConnStatus } from '../ws/types';
 export type RosMode = 'none' | 'nav' | 'plan';
 export type ModeStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
 
+export interface SavedMap { name: string; saved?: string }
+
 export interface ModeState {
   mode: RosMode;
   status: ModeStatus;
   message: string;
   model: Record<string, string>;
+  /** saved maps (from mode_manager), to pick one before starting navigation */
+  maps: SavedMap[];
 }
 
 export function parseModeState(text: string): ModeState | null {
   try {
     const s = JSON.parse(text);
     if (!s || typeof s !== 'object' || typeof s.mode !== 'string' || typeof s.status !== 'string') return null;
-    return { mode: s.mode, status: s.status, message: String(s.message ?? ''), model: s.model ?? {} };
+    const maps = Array.isArray(s.maps)
+      ? s.maps.filter((m: unknown): m is SavedMap => !!m && typeof (m as SavedMap).name === 'string')
+      : [];
+    return { mode: s.mode, status: s.status, message: String(s.message ?? ''), model: s.model ?? {}, maps };
   } catch {
     return null;
   }
@@ -53,6 +60,9 @@ export function useRobotDescription(rosStatus: ConnStatus): string | null {
   return urdf;
 }
 
-export function sendModeCommand(cmd: { op: 'start'; mode: 'nav' | 'plan' } | { op: 'stop' }): void {
+/** map (navigation only): a saved map's name to navigate on, or '' to build a new map by SLAM */
+export type ModeCommand = { op: 'start'; mode: 'nav' | 'plan'; map?: string } | { op: 'stop' };
+
+export function sendModeCommand(cmd: ModeCommand): void {
   rosClient.publishWeb('/mode/command', 'std_msgs/msg/String', { data: JSON.stringify(cmd) });
 }

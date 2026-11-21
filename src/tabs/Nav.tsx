@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBrain } from '../store/useBrain';
 import { rosClient } from '../ros/ros';
 import {
@@ -9,10 +9,16 @@ import type { TransformStamped } from '../ros/tfTree';
 import * as THREE from 'three';
 import { parseUrdf, getText, loadMeshes, RobotObject, type UrdfModel } from '../ros/robotModel';
 import { useModeState, useRobotDescription } from '../ros/useRosState';
-import { ModeBar } from '../components/ModeBar';
 import type { ConnStatus } from '../ws/types';
 import { useThemeColors } from '../theme';
-import { MapControls } from './nav/MapControls';
+import { SlamPanel, NavPanel, useNavManager } from './nav/ModePanels';
+import { Details } from '../components/Details';
+import { HoverReadout } from './nav/HoverReadout';
+import { usePersistentState, isStrings } from '../hooks/usePersistentState';
+
+type SubTab = 'slam' | 'nav';
+const isSubTab = (v: unknown): v is SubTab => v === 'slam' || v === 'nav';
+const isViewMode = (v: unknown): v is ViewMode => v === '2d' || v === '3d';
 
 function yawToQuat(yaw: number) {
   return { x: 0, y: 0, z: Math.sin(yaw / 2), w: Math.cos(yaw / 2) };
@@ -22,8 +28,6 @@ function poseMsg(x: number, y: number, yaw: number) {
   return { position: { x, y, z: 0 }, orientation: yawToQuat(yaw) };
 }
 
-const DEG = Math.PI / 180;
-const round = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 
 // 6x6 diagonal covariance for an initial pose estimate (x, y, yaw).
 const INITPOSE_COV = (() => {
@@ -72,12 +76,14 @@ export function Nav() {
   const [rosStatus, setRosStatus] = useState<ConnStatus>('disconnected');
   const mode = useModeState(rosStatus);
   const urdfText = useRobotDescription(rosStatus);
-  const [init, setInit] = useState({ x: 0, y: 0, yaw: 0 });
-  const [goal, setGoal] = useState({ x: 1, y: 0, yaw: 0 });
-  const [navState, setNavState] = useState<string>('idle');
+  const [sub, setSub] = usePersistentState<SubTab>('nav.subtab', 'slam', isSubTab);
+  // a Nav2 goal is on its way (from Nav2 Goal until it is reached, rejected or cancelled)
+  const [goalActive, setGoalActive] = useState(false);
   const [tool, setTool] = useState<Tool>('none');
-  const [view, setView] = useState<ViewMode>('2d');
-  const [hidden, setHidden] = useState<Set<Layer>>(new Set());
+  const [view, setView] = usePersistentState<ViewMode>('nav.view', '2d', isViewMode);
+  // hidden layers are stored as a list (a Set has no JSON form)
+  const [hiddenList, setHiddenList] = usePersistentState<Layer[]>('nav.hidden', ['particles'], isStrings as (v: unknown) => v is Layer[]);
+  const hidden = useMemo(() => new Set(hiddenList), [hiddenList]);
 
   useEffect(() => rosClient.onStatus(setRosStatus), []);
 
@@ -99,41 +105,47 @@ export function Nav() {
   const preview = !navModel && !!previewUrdf;
   const navUrdf = navModel ? urdfText : previewUrdf;
   const canSend = rosStatus === 'connected' && navRunning;
+  const nm = useNavManager(rosStatus, navRunning);
+  // navigating on a saved map (AMCL), not building one
+  const navigating = canSend && nm?.mode === 'navigation';
 
   const sendInitialPose = (x: number, y: number, yaw: number, frame = 'map') => {
     rosClient.publishWeb('/initialpose', 'geometry_msgs/PoseWithCovarianceStamped', {
       header: { frame_id: frame },
       pose: { pose: poseMsg(x, y, yaw), covariance: INITPOSE_COV },
     });
-    setNavState(`initial pose sent (${round(x)}, ${round(y)}, ${round(yaw / DEG, 0)}°)`);
   };
 
   const sendGoal = (x: number, y: number, yaw: number, frame = 'map') => {
     cancelRef.current?.();
-    setNavState(`navigating to (${round(x)}, ${round(y)}, ${round(yaw / DEG, 0)}°)…`);
     sceneRef.current?.setGoal({ x, y, yaw, frame });
-    cancelRef.current = rosClient.sendActionGoal(
+    setGoalActive(true);
+    const done = () => {
+      if (cancelRef.current !== cancel) return;     // a newer goal replaced this one
+      cancelRef.current = null;
+      setGoalActive(false);
+      sceneRef.current?.setGoal(null);
+    };
+    const cancel = rosClient.sendActionGoal(
       '/navigate_to_pose',
       'nav2_msgs/action/NavigateToPose',
       { pose: { header: { frame_id: frame }, pose: poseMsg(x, y, yaw) } },
       {
-        onResult: () => {
-          setNavState('goal reached / finished');
-          cancelRef.current = null;
-          sceneRef.current?.setGoal(null);
-        },
-        onError: msg => { setNavState(`goal rejected: ${msg}`); sceneRef.current?.setGoal(null); },
+        onResult: done,
+        onError: done,
       },
     );
+    cancelRef.current = cancel;
   };
 
   // the drag tools call back through a ref, so the scene can stay put
+  // the pointer's position, shown by HoverReadout (which fills this in)
+  const hoverRef = useRef<(p: { x: number; y: number } | null) => void>(() => {});
   const pickRef = useRef<(t: 'pose' | 'goal', x: number, y: number, yaw: number, frame: string) => void>(() => {});
   pickRef.current = (t, x, y, yaw, frame) => {
     setTool('none');
-    const v = { x: round(x), y: round(y), yaw: round(yaw / DEG, 0) };
-    if (t === 'pose') { setInit(v); sendInitialPose(x, y, yaw, frame); }
-    else { setGoal(v); sendGoal(x, y, yaw, frame); }
+    if (t === 'pose') sendInitialPose(x, y, yaw, frame);
+    else sendGoal(x, y, yaw, frame);
   };
 
   // the view lives as long as the tab; ROS data is fed in once connected
@@ -142,6 +154,7 @@ export function Nav() {
     const s = new NavScene(viewerRef.current, colorsRef.current, {
       onFixedFrame: setFixedFrame,
       onPick: (t, x, y, yaw, frame) => pickRef.current(t, x, y, yaw, frame),
+      onHover: p => hoverRef.current(p),
     });
     sceneRef.current = s;
     return () => { s.dispose(); sceneRef.current = null; };
@@ -208,36 +221,34 @@ export function Nav() {
 
   // leaving navigation: drop a goal still shown
   useEffect(() => {
-    if (!navRunning) { setTool('none'); sceneRef.current?.setGoal(null); }
+    if (!navRunning) {
+      setTool('none');
+      cancelRef.current = null;
+      setGoalActive(false);
+      sceneRef.current?.setGoal(null);
+    }
   }, [navRunning]);
+  // SLAM only builds the map: no pose estimate or goals there (drive with the Drive tab)
+  useEffect(() => {
+    if (sub !== 'slam') return;
+    setTool('none');
+    // a goal sent from the Navigation sub-tab is not left running
+    if (cancelRef.current) cancelGoal();
+  }, [sub]);
 
   const connect = () => rosClient.connect(host);
 
   const cancelGoal = () => {
     cancelRef.current?.();
     cancelRef.current = null;
+    setGoalActive(false);
     sceneRef.current?.setGoal(null);
-    setNavState('cancelled');
   };
 
-  const numField = (
-    label: string, v: number, on: (n: number) => void,
-  ) => (
-    <label className="nav-field">
-      {label}
-      <input type="number" step={0.1} value={v}
-        onChange={e => on(Number(e.target.value))} style={{ width: 70 }} />
-    </label>
-  );
-
-  const toggleLayer = (k: Layer) => setHidden(h => {
-    const n = new Set(h);
-    if (n.has(k)) n.delete(k); else n.add(k);
-    return n;
-  });
+  const toggleLayer = (k: Layer) => setHiddenList(h => (h.includes(k) ? h.filter(x => x !== k) : [...h, k]));
 
   const toolButton = (t: Exclude<Tool, 'none'>, label: string) => (
-    <button className={tool === t ? 'active' : ''} disabled={!canSend || !fixedFrame}
+    <button className={tool === t ? 'active' : ''} disabled={!navigating || !fixedFrame}
       onClick={() => setTool(tool === t ? 'none' : t)}
       title="click where the robot is (or should go), drag towards where it faces">
       {label}
@@ -256,38 +267,17 @@ export function Nav() {
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
 
-        <ModeBar want="nav" rosStatus={rosStatus} state={mode} />
-
-        <MapControls rosStatus={rosStatus} active={navRunning} />
-
-        <div className="card-title">Initial Pose (/initialpose)</div>
-        <div className="nav-row">
-          {numField('x', init.x, n => setInit({ ...init, x: n }))}
-          {numField('y', init.y, n => setInit({ ...init, y: n }))}
-          {numField('θ°', init.yaw, n => setInit({ ...init, yaw: n }))}
-          <button onClick={() => sendInitialPose(init.x, init.y, init.yaw * DEG)} disabled={!canSend}>Set</button>
-        </div>
-
-        <div className="card-title">Nav Goal (navigate_to_pose)</div>
-        <div className="nav-row">
-          {numField('x', goal.x, n => setGoal({ ...goal, x: n }))}
-          {numField('y', goal.y, n => setGoal({ ...goal, y: n }))}
-          {numField('θ°', goal.yaw, n => setGoal({ ...goal, yaw: n }))}
-          <button onClick={() => sendGoal(goal.x, goal.y, goal.yaw * DEG)} disabled={!canSend}>Go</button>
-          <button onClick={cancelGoal} className="danger">Cancel</button>
-        </div>
-
-        <div className="nav-status">state: {navState}</div>
-
-        <div className="card-title">Display</div>
-        <div className="nav-layers">
-          {LAYERS.map(({ key, label }) => (
-            <label key={key}>
-              <input type="checkbox" checked={!hidden.has(key)} onChange={() => toggleLayer(key)} />
-              {label}
-            </label>
+        <div className="nav-subtabs" role="tablist" aria-label="navigation mode">
+          {([['slam', 'SLAM'], ['nav', 'Navigation']] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={sub === k}
+              className={sub === k ? 'active' : ''} onClick={() => setSub(k)}>{label}</button>
           ))}
         </div>
+
+        {sub === 'slam'
+          ? <SlamPanel rosStatus={rosStatus} mode={mode} nm={nm} />
+          : <NavPanel rosStatus={rosStatus} mode={mode} nm={nm} />}
+
       </div>
 
       <div className="nav-viewer card">
@@ -302,14 +292,34 @@ export function Nav() {
             </span>
           </span>
           <span className="nav-tools">
-            {toolButton('pose', '2D Pose Estimate')}
-            {toolButton('goal', 'Nav2 Goal')}
+            {sub === 'nav' && toolButton('pose', 'Pose Estimate')}
+            {sub === 'nav' && toolButton('goal', 'Nav2 Goal')}
+            {sub === 'nav' && (
+              <button className="danger" onClick={cancelGoal} disabled={!navigating || !goalActive}
+                title="stop going to the goal (Navigation keeps running)">Cancel goal</button>
+            )}
             <button onClick={() => setView(view === '2d' ? '3d' : '2d')}>
               {view === '2d' ? '3D' : '2D'}
             </button>
           </span>
         </div>
-        <div ref={viewerRef} className="viewer3d" />
+        <div className="nav-viewer-box">
+          <div ref={viewerRef} className="viewer3d" />
+          <HoverReadout sceneRef={sceneRef} hoverRef={hoverRef} />
+          <div className="nav-display">
+            <Details id="nav.display">
+              <summary>Display</summary>
+              <div className="nav-layers">
+                {LAYERS.map(({ key, label }) => (
+                  <label key={key}>
+                    <input type="checkbox" checked={!hidden.has(key)} onChange={() => toggleLayer(key)} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </Details>
+          </div>
+        </div>
       </div>
     </div>
   );

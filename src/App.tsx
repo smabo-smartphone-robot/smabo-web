@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { PairingScreen } from './components/PairingScreen';
 import { Workspace } from './workspace/Workspace';
+import { rosClient } from './ros/ros';
 
 export default function App() {
   const autoConnect = useBrain(s => s.autoConnect);
@@ -12,6 +13,8 @@ export default function App() {
 
   useEffect(() => {
     autoConnect();
+    // ROS (rosbridge) too, when it was connected before the reload
+    rosClient.restore(useBrain.getState().host);
     // ESP32 may not be up yet; it announces /config_url once it reaches the brain.
     refreshConfigQuietly();
   }, []);

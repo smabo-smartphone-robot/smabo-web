@@ -47,6 +47,17 @@ export type ViewMode = '2d' | '3d';
 
 // frames tried in order for the view's fixed frame
 const FIXED_FRAMES = ['map', 'odom'];
+
+/** Frames the pointer's position is shown in, when TF has them. */
+export const HOVER_FRAMES = ['map', 'odom', 'base_link'];
+
+/** A ground point (x, y in `fixed`) in `frame`, or null when TF does not connect the two. */
+export function framePoint(tf: TfTree, fixed: string, frame: string, x: number, y: number): { x: number; y: number } | null {
+  const m = tf.lookup(frame, fixed);
+  if (!m) return null;
+  const p = new THREE.Vector3(x, y, 0).applyMatrix4(m);
+  return { x: p.x, y: p.y };
+}
 const clean = (f: string) => f.replace(/^\/+/, '');
 
 /** RGBA pixels for an occupancy grid (RViz "map" colours): unknown clear, free light, occupied dark. */
@@ -139,6 +150,8 @@ export class NavScene {
       onFixedFrame?: (f: string) => void;
       /** a pose picked with a tool, in the fixed frame */
       onPick?: (tool: Exclude<Tool, 'none'>, x: number, y: number, yaw: number, frame: string) => void;
+      /** the ground point under the pointer, in the fixed frame (null: the pointer left) */
+      onHover?: (p: { x: number; y: number } | null) => void;
     } = {},
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -191,6 +204,7 @@ export class NavScene {
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
     el.addEventListener('pointerup', this.onUp);
+    el.addEventListener('pointerleave', this.onLeave);
 
     this.ro = new ResizeObserver(() => {
       const cw = div.clientWidth, ch = div.clientHeight;
@@ -398,10 +412,13 @@ export class NavScene {
   };
 
   private onMove = (e: PointerEvent) => {
-    if (!this.drag) return;
     const g = this.ground(e);
+    this.handlers.onHover?.(g);
+    if (!this.drag) return;
     if (g) this.showDrag(this.drag.x, this.drag.y, Math.atan2(g.y - this.drag.y, g.x - this.drag.x));
   };
+
+  private onLeave = () => { this.handlers.onHover?.(null); };
 
   private onUp = (e: PointerEvent) => {
     if (!this.drag) return;
@@ -446,6 +463,7 @@ export class NavScene {
     el.removeEventListener('pointerdown', this.onDown);
     el.removeEventListener('pointermove', this.onMove);
     el.removeEventListener('pointerup', this.onUp);
+    el.removeEventListener('pointerleave', this.onLeave);
     this.orbit2d.dispose();
     this.orbit3d.dispose();
     this.renderer.dispose();

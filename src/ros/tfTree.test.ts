@@ -86,13 +86,15 @@ describe('costmap colours and helpers', () => {
 describe('mode state', () => {
   it('parses mode_manager JSON and rejects junk', () => {
     expect(parseModeState('{"mode":"nav","status":"running","message":"ok","model":{"arm":"false"}}'))
-      .toEqual({ mode: 'nav', status: 'running', message: 'ok', model: { arm: 'false' } });
+      .toEqual({ mode: 'nav', status: 'running', message: 'ok', model: { arm: 'false' }, maps: [] });
+    expect(parseModeState('{"mode":"none","status":"stopped","maps":[{"name":"room_1","saved":"x"},{"bad":1}]}')?.maps)
+      .toEqual([{ name: 'room_1', saved: 'x' }]);
     expect(parseModeState('nope')).toBeNull();
     expect(parseModeState('{"status":"running"}')).toBeNull();
   });
   it('summarises the state for the mode bar', () => {
     const s = (mode: 'none' | 'nav' | 'plan', status: 'running' | 'starting' | 'error') =>
-      ({ mode, status, message: 'boom', model: {} });
+      ({ mode, status, message: 'boom', model: {}, maps: [] });
     expect(modeSummary('disconnected', null).tone).toBe('off');
     expect(modeSummary('connected', null).tone).toBe('err');
     expect(modeSummary('connected', s('nav', 'running'))).toEqual({ text: 'Navigation: running', tone: 'ok' });

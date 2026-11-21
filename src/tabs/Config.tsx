@@ -8,6 +8,7 @@ import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config
 import { RandomGroupSettings } from './config/RandomGroupSettings';
 import { ServoTable } from './config/ServoTable';
 import { driveModes, driveView } from './config/driveModes';
+import { Details } from '../components/Details';
 import { HintIcon } from '../components/HintIcon';
 
 
@@ -104,12 +105,12 @@ export function Config() {
       </div>
 
       {/* ── Modes ───────────────────────────────────── */}
-      <details open>
+      <Details id="config.modes" defaultOpen>
         <summary>Modes</summary>
         <div className="config-section">
 
           {/* servos */}
-          <details>
+          <Details id="config.servos">
             <summary>
               <span style={{ flex: 1 }}>servos</span>
               <input type="checkbox" checked={b(modes['servos'])}
@@ -148,11 +149,11 @@ export function Config() {
               }}>+ Add servo</button>
               <RandomGroupSettings rgroups={rgroups} patch={patch} />
             </div>
-          </details>
+          </Details>
 
           {/* dc_drive, with the encoders as an option (= encoder_drive on the ESP32):
               the dc settings apply with or without them */}
-          <details>
+          <Details id="config.dc_drive">
             <summary>
               <span style={{ flex: 1 }}>dc_drive</span>
               <input type="checkbox" checked={drive.dc}
@@ -224,10 +225,10 @@ export function Config() {
                 <InlineNum value={n(encCov['twist_ww'], 0.001)} w={64} onChange={v => patch({ encoder: { covariance: { twist_ww: v } } })} />
               </div>
             </div>
-          </details>
+          </Details>
 
           {/* lidar */}
-          <details>
+          <Details id="config.lidar">
             <summary>
               <span style={{ flex: 1 }}>lidar</span>
               <input type="checkbox" checked={b(modes['lidar'])}
@@ -262,13 +263,13 @@ export function Config() {
                   onChange={e => patch({ lidar: { clockwise: e.target.checked } })} />
               </div>
             </div>
-          </details>
+          </Details>
 
         </div>
-      </details>
+      </Details>
 
       {/* ── Advanced ─────────────────────────────────── */}
-      <details>
+      <Details id="config.advanced">
         <summary>Advanced – pins / bus / WiFi ⚠️ reboot</summary>
         <div className="config-section">
           <div style={{ color: 'var(--orange)', fontSize: '.72rem', marginBottom: 6 }}>
@@ -348,18 +349,18 @@ export function Config() {
             >Discard</button>
           </div>
         </div>
-      </details>
+      </Details>
 
       {/* ── Phone (smabo-app): its own REST API ─────── */}
       <PhoneSettings />
 
       {/* ── Full config JSON ─────────────────────────── */}
-      <details>
+      <Details id="config.json">
         <summary>Full ESP32 config (JSON)</summary>
         <div className="config-section">
           <pre className="config-full-json">{JSON.stringify(esp32Config, null, 2)}</pre>
         </div>
-      </details>
+      </Details>
     </div>
   );
 }
