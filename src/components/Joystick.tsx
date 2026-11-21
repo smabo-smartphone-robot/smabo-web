@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useThemeColors } from '../theme';
+import { shapeAxis } from './joystickCurve';
 
 interface JoystickProps {
   maxLin: number;
@@ -261,10 +262,11 @@ export function Joystick({ maxLin, maxAng, onCmd, onStop, disabled = false }: Jo
 
       const { x, y } = stickRef.current;
       if (x !== 0 || y !== 0) {
-        const lin = y * maxLinRef.current;
+        // dead zone + quadratic curve: small movements drive gently
+        const lin = shapeAxis(y) * maxLinRef.current;
         const effLin = Math.abs(y) < 0.2 ? 0 : lin; // spin zone: pure rotation when near-horizontal
         const angSign = effLin < 0 ? 1 : -1;          // reverse ang direction when reversing
-        onCmdRef.current(effLin, angSign * x * maxAngRef.current);
+        onCmdRef.current(effLin, angSign * shapeAxis(x) * maxAngRef.current);
       }
     }, 80);
 

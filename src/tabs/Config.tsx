@@ -245,6 +245,11 @@ export function Config() {
                 <InlineNum value={n(lidar['range_min'], 0.05)} w={60} onChange={v => patch({ lidar: { range_min: v } })} />
                 <span style={lbl}>range_max (m)</span>
                 <InlineNum value={n(lidar['range_max'], 12.0)} w={60} onChange={v => patch({ lidar: { range_max: v } })} />
+                <span style={lbl}>angle_offset (deg)</span>
+                <InlineNum value={n(lidar['angle_offset'], 0)} w={60} onChange={v => patch({ lidar: { angle_offset: v } })} />
+                <span style={lbl}>clockwise</span>
+                <input type="checkbox" checked={b(lidar['clockwise'], true)}
+                  onChange={e => patch({ lidar: { clockwise: e.target.checked } })} />
               </div>
             </div>
           </details>

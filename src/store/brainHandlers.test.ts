@@ -14,6 +14,7 @@ vi.mock('../ws/brain', () => ({
     refusal: null,
     onMsg: (h: (m: RosbridgeMsg) => void) => { hooks.msg = h; return () => {}; },
     onStatus: (h: (s: ConnStatus) => void) => { hooks.status = h; return () => {}; },
+    send: vi.fn(),
   },
 }));
 vi.mock('../rtc/webrtc', () => ({ handleBrainOffer: vi.fn() }));
@@ -21,6 +22,7 @@ vi.mock('../ws/esp32', () => ({ esp32: { setGateway: vi.fn() }, phone: { setGate
 
 import * as webrtc from '../rtc/webrtc';
 import { esp32, phone } from '../ws/esp32';
+import { brain } from '../ws/brain';
 import { registerBrainHandlers } from './brainHandlers';
 import { PROTOCOL_VERSION } from '../version';
 
@@ -174,6 +176,13 @@ describe('topics', () => {
     expect(store.state.trail).toEqual([{ x: 1, y: 2 }, { x: 1, y: 2 }]);
   });
 
+  it('/wheel_vel counts the revolutions of each wheel with the ESP32 wheel radius', () => {
+    store.state.esp32Config = { dc: { wheel_radius: 0.5 / Math.PI } };   // 1 m per revolution
+    publish('/wheel_vel', { left: 1, right: -2, dt: 0.5 });
+    publish('/wheel_vel', { left: 1, right: -2, dt: 0.5 });
+    expect(store.state.wheel).toEqual({ left: 1, right: -2, revLeft: 1, revRight: -2 });
+  });
+
   it('/webrtc/web_offer hands the SDP to WebRTC', () => {
     publish('/webrtc/web_offer', str('v=0'));
     expect(webrtc.handleBrainOffer).toHaveBeenCalledWith('v=0');
@@ -194,5 +203,36 @@ describe('connection status', () => {
     hooks.status!('disconnected');
     expect(store.state).toMatchObject({ status: 'disconnected', esp32Connected: null, brainInfo: null, protocolWarnings: {} });
     expect(store.actions.addToast).toHaveBeenCalledWith('Brain disconnected');
+  });
+});
+
+describe('/hello (smabo-brain-ros: no connection notices)', () => {
+  const rosInfo = () => publish('/brain/info',
+    str(JSON.stringify({ protocol: PROTOCOL_VERSION, brain: 'smabo-brain-ros', version: '0.2.0' })));
+  const hello = (client: string, protocol = PROTOCOL_VERSION) =>
+    publish('/hello', str(JSON.stringify({ protocol, client, version: '1.0' })));
+
+  it('subscribes to /hello once smabo-brain-ros says who it is, not for smabo-brain', () => {
+    publish('/brain/info', str(JSON.stringify({ protocol: PROTOCOL_VERSION, brain: 'smabo-brain' })));
+    expect(brain.send).not.toHaveBeenCalled();
+    rosInfo();
+    rosInfo();
+    expect(brain.send).toHaveBeenCalledTimes(1);
+    expect(brain.send).toHaveBeenCalledWith({ op: 'subscribe', topic: '/hello', type: 'std_msgs/msg/String' });
+  });
+
+  it('an ESP32 hello marks it connected with a toast; the web\'s own hello is ignored', () => {
+    rosInfo();
+    hello('smabo-web');
+    expect(store.actions.addToast).not.toHaveBeenCalled();
+    hello('smabo-esp32');
+    expect(store.state.esp32Connected).toBe(true);
+    expect(store.actions.addToast).toHaveBeenCalledWith('smabo-esp32 connected', 'ok');
+  });
+
+  it('an ESP32 on another protocol warns', () => {
+    rosInfo();
+    hello('smabo-esp32', PROTOCOL_VERSION + 1);
+    expect(store.actions.addToast).toHaveBeenCalledWith(expect.stringContaining('speaks protocol'), 'err');
   });
 });

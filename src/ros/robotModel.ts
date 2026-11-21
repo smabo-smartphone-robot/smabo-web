@@ -207,7 +207,7 @@ export class RobotObject {
   private linkObj = new Map<string, THREE.Object3D>();
   private motion = new Map<string, { obj: THREE.Object3D; joint: UrdfJoint }>();
 
-  constructor(private model: UrdfModel, meshes: Map<string, THREE.BufferGeometry>, look: RobotLook) {
+  constructor(model: UrdfModel, meshes: Map<string, THREE.BufferGeometry>, look: RobotLook) {
     const build = (link: string, moving: boolean): THREE.Object3D => {
       const g = new THREE.Group();
       g.name = link;
