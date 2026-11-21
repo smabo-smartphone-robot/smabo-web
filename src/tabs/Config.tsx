@@ -8,6 +8,7 @@ import { arr, b, n, rec, s, InlineNum, InlineStr, SectionHeader } from './config
 import { RandomGroupSettings } from './config/RandomGroupSettings';
 import { ServoTable } from './config/ServoTable';
 import { driveModes, driveView } from './config/driveModes';
+import { HintIcon } from '../components/HintIcon';
 
 
 // ── main ─────────────────────────────────────────────────────
@@ -174,6 +175,15 @@ export function Config() {
                 <InlineNum value={n(dc['cmd_timeout'], 0.5)} w={60} onChange={v => patch({ dc: { cmd_timeout: v } })} />
                 <span style={lbl} title="0 以外の指令の duty をこの値まで引き上げる（静止摩擦対策、0 = 無効）">min_duty (0-1)</span>
                 <InlineNum value={n(dc['min_duty'], 0)} w={60} onChange={v => patch({ dc: { min_duty: v } })} />
+                <span style={lbl}>
+                  trim{' '}
+                  <HintIcon label="trim の説明">
+                    直進したときの左右差の補正。まっすぐ走らせて右に寄るなら正、左に寄るなら負（0.01 = 1 %）。
+                    正にすると左の車輪が遅く、右の車輪が速くなります。
+                    目安は 0.13 × 横ずれ(m) ÷ 走った距離(m)²（例: 1 m 走って 5 cm 右に寄ったら 0.0065）。
+                  </HintIcon>
+                </span>
+                <InlineNum value={n(dc['trim'], 0)} w={60} onChange={v => patch({ dc: { trim: v } })} />
                 <span style={lbl}>invert_left</span>
                 <input type="checkbox" checked={b(dc['invert_left'])} onChange={e => patch({ dc: { invert_left: e.target.checked } })} />
                 <span style={lbl}>invert_right</span>

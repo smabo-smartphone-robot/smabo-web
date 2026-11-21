@@ -1494,3 +1494,52 @@ details[open] > summary::before {
   min-width: 140px;
   font-size: .8rem;
 }
+
+/* "!" hint badge: the hint shows while hovered or focused */
+.hint-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--orange);
+  font: 700 .65rem/1 var(--font-sans);
+  cursor: help;
+  vertical-align: 1px;
+  transition: background .15s, border-color .15s;
+}
+.hint-icon:hover,
+.hint-icon:focus-visible {
+  background: var(--bg4);
+  border-color: var(--orange);
+  outline: none;
+}
+.hint-icon-tip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--bg3);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font: 400 .75rem/1.6 var(--font-sans);
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .15s;
+}
+.hint-icon:hover .hint-icon-tip,
+.hint-icon:focus .hint-icon-tip {
+  opacity: 1;
+  visibility: visible;
+}
