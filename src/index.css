@@ -1161,6 +1161,18 @@ details[open] > summary::before {
   min-width: 0;
 }
 
+/* Motion Plan's controls */
+.nav-controls--wide { width: 380px; }
+
+/* a narrow pane: the controls go above the view, at the pane's full width
+   (side by side, the fixed-width controls pushed the SLAM / Navigation
+   sub-tabs out of sight and squeezed the view to nothing) */
+@container (max-width: 640px) {
+  .nav-layout { flex-direction: column; height: auto; }
+  .nav-controls { width: auto; overflow: visible; }
+  .nav-viewer { min-height: 360px; }
+}
+
 .viewer3d {
   flex: 1;
   min-height: 320px;

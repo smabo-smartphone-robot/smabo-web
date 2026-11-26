@@ -203,9 +203,12 @@ export function Plan() {
 
     // render loop (+ planned-path animation)
     let raf = 0;
-    const t0 = performance.now();
+    // each new plan plays from its start (not from wherever the loop happened to be)
+    let shown: typeof trajRef.current = null;
+    let t0 = performance.now();
     const loop = () => {
       const tr = trajRef.current;
+      if (tr !== shown) { shown = tr; t0 = performance.now(); }
       if (s.trail) {
         s.trail.visible = !!tr && trailRef.current && tr.points.length > 0;
         if (tr && s.trail.visible) {
@@ -438,16 +441,13 @@ export function Plan() {
 
   return (
     <div className="nav-layout">
-      <div className="nav-controls card" style={{ width: 380 }}>
+      <div className="nav-controls nav-controls--wide card">
         <div className="card-title">MoveIt2 — rosbridge</div>
         <div className="nav-row">
-          <button onClick={() => rosClient.connect(host)}>
-            {connected ? 'Disconnect ROS' : 'Connect ROS'}
-          </button>
           <span className={`dot ${rosStatus}`} title={rosStatus} />
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
-        <ModeBar want="plan" rosStatus={rosStatus} state={modeState} />
+        <ModeBar want="plan" rosStatus={rosStatus} state={modeState} host={host} />
         {loadState && <div className="nav-status">{loadState}</div>}
 
         <div className="card-title">Planning group</div>

@@ -10,6 +10,7 @@ import type { ConnStatus } from '../../ws/types';
 import { sendModeCommand, type ModeState } from '../../ros/useRosState';
 import { modeSummary } from '../../components/ModeBar';
 import { usePersistentState } from '../../hooks/usePersistentState';
+import { useConnectThenStart } from '../../ros/useConnectThenStart';
 
 export interface NavManagerState {
   mode: 'off' | 'mapping' | 'navigation';
@@ -60,6 +61,7 @@ const TONE_COLOR = { ok: 'var(--green)', busy: 'var(--orange)', off: 'var(--dim)
 
 interface PanelProps {
   rosStatus: ConnStatus;
+  host: string;              // brain-ros, connected to by a Start button
   mode: ModeState | null;
   nm: NavManagerState | null;
 }
@@ -121,17 +123,23 @@ function ToggleButton({ p, want, label, onStart, startOk = true, title, warning 
   const st = toggleState(want, p.mode, p.nm);
   const [asking, setAsking] = useState(false);
   useEffect(() => { if (!warning) setAsking(false); }, [warning]);
+  const ok = st === 'start' && canCommand(p) && startOk;
+  // also run after connecting, with brain-ros's state by then: confirm a switch, or
+  // do nothing when this side already runs (or, say, there is no saved map)
+  const act = () => { if (!ok) return; if (warning) setAsking(true); else onStart(); };
+  const { press, connecting } = useConnectThenStart(p.host, canCommand(p), act);
+  const connected = p.rosStatus === 'connected';
   if (st === 'stop') {
     return (
       <button className="danger" onClick={() => sendModeCommand({ op: 'stop' })}
         disabled={p.rosStatus !== 'connected' || !!p.nm?.busy}>Stop</button>
     );
   }
-  const ok = st === 'start' && canCommand(p) && startOk;
   return (
     <>
-      <button onClick={() => (warning ? setAsking(true) : onStart())} disabled={!ok || asking} title={title}>
-        {st === 'starting' ? 'Starting…' : st === 'stopping' ? 'Stopping…' : label}
+      <button onClick={press} disabled={connecting || asking || (connected && !ok)}
+        title={connected ? title : 'connects to brain-ros, then starts'}>
+        {connecting ? 'Connecting…' : st === 'starting' ? 'Starting…' : st === 'stopping' ? 'Stopping…' : label}
       </button>
       {asking && warning && (
         <div className="nav-confirm" role="alertdialog" aria-label="confirm switch">
