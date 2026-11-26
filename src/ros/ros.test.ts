@@ -10,7 +10,13 @@ class FakeRos {
   emit(ev: string) { (this.handlers[ev] ?? []).forEach(cb => cb()); }
   close() { this.closed = true; }
 }
-vi.mock('roslib', () => ({ Ros: FakeRos }));
+const advertised: string[] = [];
+class FakeTopic {
+  constructor(public opts: { name: string }) {}
+  advertise() { advertised.push(this.opts.name); }
+  publish() {}
+}
+vi.mock('roslib', () => ({ Ros: FakeRos, Topic: FakeTopic, Message: class { constructor(public m: unknown) {} } }));
 
 // a stand-in for the browser's localStorage
 const store = new Map<string, string>();
@@ -31,10 +37,10 @@ describe('rosClient connect / disconnect', () => {
   it('ignores a closed connection whose close event comes after the next one is up', () => {
     const seen: string[] = [];
     const off = rosClient.onStatus(s => seen.push(s));
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     made[0].emit('connection');
-    rosClient.connect('host:9090');          // Disconnect ROS
-    rosClient.connect('host:9090');          // Connect ROS again
+    rosClient.disconnect();
+    rosClient.open('host:9090');             // connect again
     made[1].emit('connection');
     made[0].emit('close');                   // the first socket's close, late
     made[0].emit('error');
@@ -46,29 +52,68 @@ describe('rosClient connect / disconnect', () => {
   });
 
   it('a closed connection cannot report itself connected', () => {
-    rosClient.connect('host:9090');
-    rosClient.connect('host:9090');          // cancel while still connecting
+    rosClient.open('host:9090');
+    rosClient.disconnect();                  // cancel while still connecting
     made[0].emit('connection');
     expect(rosClient.status).toBe('disconnected');
     expect(rosClient.ros).toBeNull();
   });
 
   it('the current connection closing from the server side drops it', () => {
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     made[0].emit('connection');
     made[0].emit('close');
     expect(rosClient.status).toBe('disconnected');
     expect(rosClient.ros).toBeNull();
-    rosClient.connect('host:9090');          // one click reconnects
+    rosClient.open('host:9090');             // one Start reconnects
+    expect(made).toHaveLength(2);
+    expect(rosClient.status).toBe('connecting');
+  });
+
+  it('advertises the command topics as soon as the connection is up', () => {
+    advertised.length = 0;
+    rosClient.open('host:9090');
+    expect(advertised).toEqual([]);
+    made[0].emit('connection');
+    expect(advertised).toEqual(['/web/mode/command', '/web/nav/command']);
+  });
+
+  it('open while connected or connecting does nothing', () => {
+    rosClient.open('host:9090');
+    rosClient.open('host:9090');             // a second Start while connecting
+    expect(made).toHaveLength(1);
+    made[0].emit('connection');
+    rosClient.open('host:9090');             // and once connected
+    expect(made).toHaveLength(1);
+    expect(rosClient.status).toBe('connected');
+  });
+
+  it('open with another host switches the connection over', () => {
+    rosClient.open('host:9090');
+    made[0].emit('connection');
+    rosClient.open('other:9090');            // the brain host was changed, then Start
+    expect(made).toHaveLength(2);
+    expect(made[0].closed).toBe(true);
+    expect(made[1].opts.url).toBe('ws://other:9090');
+    expect(rosClient.status).toBe('connecting');
+  });
+
+  it('a connection that fails stays in error after its socket closes', () => {
+    rosClient.open('host:9090');
+    made[0].emit('error');
+    made[0].emit('close');
+    expect(rosClient.status).toBe('error');
+    expect(rosClient.ros).toBeNull();
+    rosClient.open('host:9090');             // the next Start tries again
     expect(made).toHaveLength(2);
     expect(rosClient.status).toBe('connecting');
   });
 
   it('reconnecting after an error closes the failed socket', () => {
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     made[0].emit('error');
     expect(rosClient.status).toBe('error');
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     expect(made[0].closed).toBe(true);
     expect(rosClient.ros).toBe(made[1]);
   });
@@ -82,7 +127,7 @@ describe('rosClient across a reload', () => {
   });
 
   it('connects again on load when ROS was connected', () => {
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     made[0].emit('connection');
     // reload: a new page has no connection, the browser still has the flag
     (rosClient as unknown as { _ros: unknown })._ros = null;
@@ -91,9 +136,9 @@ describe('rosClient across a reload', () => {
     expect(made[1].opts.url).toBe('ws://host:9090');
   });
 
-  it('stays disconnected after Disconnect ROS', () => {
-    rosClient.connect('host:9090');
-    rosClient.connect('host:9090');          // Disconnect ROS
+  it('stays disconnected after disconnect()', () => {
+    rosClient.open('host:9090');
+    rosClient.disconnect();
     rosClient.restore('host:9090');
     expect(made).toHaveLength(1);
     expect(rosClient.status).toBe('disconnected');
@@ -105,7 +150,7 @@ describe('rosClient across a reload', () => {
   });
 
   it('a connection the server dropped is still connected again on load', () => {
-    rosClient.connect('host:9090');
+    rosClient.open('host:9090');
     made[0].emit('connection');
     made[0].emit('close');
     rosClient.restore('host:9090');

@@ -12,8 +12,8 @@ import type { ConnStatus } from '../ws/types';
 
 type StatusHandler = (s: ConnStatus) => void;
 
-// "Connect ROS" is remembered until "Disconnect ROS", so a reload connects again
-// (a connection the server dropped stays remembered too).
+// Once a Start button has connected (open), the page connects again after a reload
+// (a connection the server dropped stays remembered too) until disconnect().
 const KEEP_KEY = 'smabo-ros-connected';
 
 function keep(on: boolean): void {
@@ -21,6 +21,22 @@ function keep(on: boolean): void {
     if (on) localStorage.setItem(KEEP_KEY, '1');
     else localStorage.removeItem(KEEP_KEY);
   } catch { /* no storage: nothing to remember */ }
+}
+
+// Command topics advertised as soon as a connection is up. rosbridge makes a ROS
+// publisher on advertise, and smabo-brain-ros's relay (topic_tools, which looks for
+// new publishers every 100 ms) loses a message sent right after that: a Start sent
+// the moment a fresh connection is ready never reached mode_manager. Advertised at
+// connect, the publisher is matched by the time a command goes out.
+export const COMMAND_TOPICS: [string, string][] = [
+  ['/mode/command', 'std_msgs/msg/String'],
+  ['/nav/command', 'std_msgs/String'],
+];
+/** how long after connecting a command is sure to pass the relay (see above) */
+export const SETTLE_MS = 1000;
+
+function wsUrl(host: string): string {
+  return /^wss?:\/\//.test(host) ? host : `ws://${host}`;
 }
 
 function kept(): boolean {
@@ -31,18 +47,21 @@ class RosClient {
   private _ros: ROSLIB.Ros | null = null;
   private _status: ConnStatus = 'disconnected';
   private statusHandlers = new Set<StatusHandler>();
+  private _topics = new Map<string, ROSLIB.Topic>();   // '/web…' topics of this connection
+  private _connectedAt = 0;
+  private _url = '';                                    // the current connection's ws:// URL
 
   get ros(): ROSLIB.Ros | null { return this._ros; }
   get isConnected(): boolean { return this._status === 'connected'; }
   get status(): ConnStatus { return this._status; }
+  /** ms since this connection came up (0 when not connected) */
+  get connectedFor(): number { return this._status === 'connected' ? Date.now() - this._connectedAt : 0; }
 
-  /** Connect to ws://<host> (host already includes :9090 by default); while
-   *  connected or connecting, disconnect instead (the Connect / Disconnect button). */
-  connect(host: string): void {
-    if (this._ros && (this._status === 'connected' || this._status === 'connecting')) {
-      this.disconnect();
-      return;
-    }
+  /** Connect to ws://<host> (host already includes :9090 by default) unless
+   *  already connected or connecting — what a Start button does first. */
+  open(host: string): void {
+    // the same host already connected or connecting: nothing to do (another host: switch over)
+    if (this._ros && this._url === wsUrl(host) && (this._status === 'connected' || this._status === 'connecting')) return;
     keep(true);
     this._open(host);
   }
@@ -55,7 +74,8 @@ class RosClient {
   private _open(host: string): void {
     try { this._ros?.close(); } catch { /* ignore */ }   // a connection left in 'error'
     this._setStatus('connecting');
-    const url = /^wss?:\/\//.test(host) ? host : `ws://${host}`;
+    const url = wsUrl(host);
+    this._url = url;
     const ros = new ROSLIB.Ros({ url });
     // A closed connection's events arrive later (its 'close' can come after the next
     // connection is up); only the current connection may change the status.
@@ -72,13 +92,17 @@ class RosClient {
           if ((m?.op === 'action_result' || m?.op === 'action_feedback') && m.id) ros.emit(m.id, m);
         } catch { /* ignore */ }
       });
+      this._topics.clear();
+      for (const [topic, type] of COMMAND_TOPICS) this._webTopic(topic, type).advertise();
+      this._connectedAt = Date.now();
       this._setStatus('connected');
     });
     ros.on('error', () => { if (current()) this._setStatus('error'); });
     ros.on('close', () => {
       if (!current()) return;
       this._ros = null;
-      this._setStatus('disconnected');
+      // a connection that failed stays 'error' (brain-ros not reachable) until the next try
+      if (this._status !== 'error') this._setStatus('disconnected');
     });
     this._ros = ros;
   }
@@ -93,8 +117,18 @@ class RosClient {
   /** Publish once on a '/web'-prefixed topic (relay strips the prefix). */
   publishWeb(topic: string, messageType: string, msg: Record<string, unknown>): void {
     if (!this._ros) return;
-    const t = new ROSLIB.Topic({ ros: this._ros, name: `/web${topic}`, messageType });
-    t.publish(new ROSLIB.Message(msg));
+    this._webTopic(topic, messageType).publish(new ROSLIB.Message(msg));
+  }
+
+  /** one Topic per '/web' topic and connection: advertised once, then reused */
+  private _webTopic(topic: string, messageType: string): ROSLIB.Topic {
+    const name = `/web${topic}`;
+    let t = this._topics.get(name);
+    if (!t) {
+      t = new ROSLIB.Topic({ ros: this._ros!, name, messageType });
+      this._topics.set(name, t);
+    }
+    return t;
   }
 
   /** Subscribe to a canonical topic; returns an unsubscribe function. */

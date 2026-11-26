@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { TfTree, type TransformStamped } from './tfTree';
 import { mapPixels, scanPoints, costColor, yawOf } from './navScene';
 import { parseModeState } from './useRosState';
-import { modeSummary } from '../components/ModeBar';
+import { modeSummary, switchAwayWarning } from '../components/ModeBar';
 
 const tf = (parent: string, child: string, x: number, y: number, yaw = 0): TransformStamped => ({
   header: { frame_id: parent },
@@ -100,5 +100,14 @@ describe('mode state', () => {
     expect(modeSummary('connected', s('nav', 'running'))).toEqual({ text: 'Navigation: running', tone: 'ok' });
     expect(modeSummary('connected', s('plan', 'starting'))).toEqual({ text: 'Motion Plan: starting…', tone: 'busy' });
     expect(modeSummary('connected', s('nav', 'error')).text).toBe('error: boom');
+  });
+  it('asks before Start Motion Plan stops a running Navigation', () => {
+    const s = (mode: 'none' | 'nav' | 'plan', status: 'running' | 'starting') =>
+      ({ mode, status, message: '', model: {}, maps: [] });
+    expect(switchAwayWarning('plan', s('nav', 'running'))).toMatch(/^Navigation is running\. Stop it and start Motion Plan\?.*not saved/);
+    expect(switchAwayWarning('plan', s('plan', 'running'))).toBeNull();
+    expect(switchAwayWarning('plan', s('none', 'running'))).toBeNull();
+    expect(switchAwayWarning('plan', s('nav', 'starting'))).toBeNull();
+    expect(switchAwayWarning('plan', null)).toBeNull();
   });
 });

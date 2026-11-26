@@ -66,7 +66,7 @@ python -m http.server --directory dist
 送信トピックにはすべて `/web` prefix が自動付与されます（brain 側で剥がして再配信）。
 
 Navigation / Motion Plan タブは、ヘッダーの Brain 欄と同じホストへ roslib（`ws://<host>`）で
-rosbridge_suite（smabo-brain-ros）に別途接続します（各タブの「Connect ROS」）。
+rosbridge_suite（smabo-brain-ros）に別途接続します（「Start SLAM」「Start Navigation」「Start Motion Plan」を押したときに自動で接続）。
 
 ## 画面
 

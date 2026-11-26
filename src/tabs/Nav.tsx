@@ -236,8 +236,6 @@ export function Nav() {
     if (cancelRef.current) cancelGoal();
   }, [sub]);
 
-  const connect = () => rosClient.connect(host);
-
   const cancelGoal = () => {
     cancelRef.current?.();
     cancelRef.current = null;
@@ -260,9 +258,6 @@ export function Nav() {
       <div className="nav-controls card">
         <div className="card-title">Nav2 — rosbridge</div>
         <div className="nav-row">
-          <button onClick={connect}>
-            {rosStatus === 'connected' ? 'Disconnect ROS' : 'Connect ROS'}
-          </button>
           <span className={`dot ${rosStatus}`} title={rosStatus} />
           <span style={{ fontSize: '.7rem', color: 'var(--dim)' }}>{host}</span>
         </div>
@@ -275,8 +270,8 @@ export function Nav() {
         </div>
 
         {sub === 'slam'
-          ? <SlamPanel rosStatus={rosStatus} mode={mode} nm={nm} />
-          : <NavPanel rosStatus={rosStatus} mode={mode} nm={nm} />}
+          ? <SlamPanel rosStatus={rosStatus} host={host} mode={mode} nm={nm} />
+          : <NavPanel rosStatus={rosStatus} host={host} mode={mode} nm={nm} />}
 
       </div>
 
@@ -285,7 +280,7 @@ export function Nav() {
           <span>
             View
             <span style={{ fontWeight: 400, color: 'var(--dim)', marginLeft: 8 }}>
-              {rosStatus !== 'connected' ? 'connect ROS to show data'
+              {rosStatus !== 'connected' ? 'Start SLAM or Navigation to show data'
                 : !navModel && !preview ? 'start Navigation to show the robot'
                 : preview && !viewState ? 'preview — Start Navigation to run Nav2'
                 : viewState || (fixedFrame ? `frame: ${fixedFrame}` : 'waiting for /tf…')}
